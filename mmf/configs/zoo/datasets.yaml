@@ -141,7 +141,6 @@ ocrvqa:
         file_name: features.tar.gz
         hashcode: 1c9eb9df544d431f438d340afe493a4d3db759eedd485033f88fc639106edeb8
 
-
 textcaps:
   defaults:
     version: 1.0_2020_05_04

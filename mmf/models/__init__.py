@@ -14,7 +14,7 @@ from .mmbt import MMBT, MMBTForClassification, MMBTForPreTraining
 from .mmf_transformer import MMFTransformer
 from .pythia import Pythia
 from .top_down_bottom_up import TopDownBottomUp
-from .unimodal import UnimodalBase, UnimodalText, UnimodalModal
+from .unimodal import UnimodalBase, UnimodalText, UnimodalImage
 from .uniter import UNITER
 from .vilbert import ViLBERT
 from .vilt import ViLT
@@ -42,7 +42,7 @@ __all__ = [
     "VisualBERT",
     "ViLBERT",
     "UnimodalBase",
-    "UnimodalModal",
+    "UnimodalImage",
     "UnimodalText",
     "AlbefVitEncoder",
     "ViLT",

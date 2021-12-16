@@ -29,3 +29,4 @@ eggs/
 *.so
 *-checkpoint.ipynb
 !tests/data
+wandb/

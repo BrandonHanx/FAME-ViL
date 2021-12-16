@@ -1,0 +1,40 @@
+includes:
+- configs/models/alignment/defaults.yaml
+
+model_config:
+  cm_shared_transformer:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+
+scheduler:
+  type: warmup_linear
+  params:
+    num_warmup_steps: 2000
+    num_training_steps: ${training.max_updates}
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-4
+    eps: 1e-8
+
+evaluation:
+  metrics:
+  - r@1_rev_retrieval
+  - r@5_rev_retrieval
+  - r@10_rev_retrieval
+
+training:
+  experiment_name: cm_shared_transformer_facad
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 40000
+  evaluation_interval: 1
+  # wandb:
+  #   enabled: true
+
+run_type: train_val

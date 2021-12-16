@@ -21,4 +21,4 @@ class RetrievalBuilder(MMFDatasetBuilder):
 
 @classmethod
 def config_path(cls):
-    return "config/datasets/retrieval/flickr30k_defaults.yaml"
+    return "configs/datasets/retrieval/flickr30k_defaults.yaml"

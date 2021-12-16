@@ -14,7 +14,6 @@ model_config:
         pretrained: true
         pool_type: avg
         num_output_features: 1
-
     classifier:
       type: mlp
       params:

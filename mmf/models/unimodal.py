@@ -72,7 +72,7 @@ class UnimodalText(BaseModel):
 
 
 @registry.register_model("unimodal_image")
-class UnimodalModal(BaseModel):
+class UnimodalImage(BaseModel):
     def __init__(self, config, *args, **kwargs):
         super().__init__(config)
 

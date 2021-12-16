@@ -12,7 +12,6 @@ model_config:
         num_attention_heads: 12
         output_attentions: false
         output_hidden_states: false
-
     classifier:
       params:
         in_dim: 768
