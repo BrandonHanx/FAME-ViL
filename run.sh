@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PYTHONHOME="/vol/research/xmodal_dl/mmf/bin"
+PYTHONHOME="/vol/research/xmodal_dl/mmf-env/bin"
 HOME="/vol/research/xmodal_dl/mmf"
 
 echo $HOME

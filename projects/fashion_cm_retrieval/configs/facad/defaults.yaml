@@ -15,7 +15,7 @@ model_config:
 scheduler:
   type: multi_step
   params:
-    use_warmup: true
+    use_warmup: false
     lr_steps:
     - 43260
     - 86520
@@ -40,6 +40,8 @@ training:
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360
+  # log_interval: 1
+  checkpoint_interval: 1442
   evaluation_interval: 1442
   wandb:
     enabled: true

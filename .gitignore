@@ -30,3 +30,4 @@ eggs/
 *-checkpoint.ipynb
 !tests/data
 wandb/
+logs/
