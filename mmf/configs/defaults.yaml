@@ -292,7 +292,7 @@ env:
 
     # Directory for saving checkpoints and other metadata
     # Use MMF_SAVE_DIR or oc.env.save_dir to override
-    save_dir: ${oc.env:MMF_SAVE_DIR, save}
+    save_dir: ${oc.env:MMF_SAVE_DIR, save}/${training.experiment_name}
 
     # Directory for saving logs, default is "logs" inside the save folder
     # If log_dir is specifically passed, logs will be written inside that folder
