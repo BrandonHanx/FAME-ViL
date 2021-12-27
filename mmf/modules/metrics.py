@@ -1312,6 +1312,38 @@ class RecallAt10_rev_ret(RecallAtK_ret):
         return ratk
 
 
+@registry.register_metric("r@50_retrieval")
+class RecallAt50_ret(RecallAtK_ret):
+    def __init__(self):
+        super().__init__("r@50")
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        ratk = super().calculate(sample_list, model_output, 50)
+        return ratk
+
+
+@registry.register_metric("r@50_rev_retrieval")
+class RecallAt50_rev_ret(RecallAtK_ret):
+    def __init__(self):
+        super().__init__("r@50_rev")
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        ratk = super().calculate(sample_list, model_output, 50, flip=True)
+        return ratk
+
+
 @registry.register_metric("detection_mean_ap")
 class DetectionMeanAP(BaseMetric):
     """Metric for calculating the detection mean average precision (mAP) using the COCO

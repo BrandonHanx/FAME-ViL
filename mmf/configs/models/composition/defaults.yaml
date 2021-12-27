@@ -1,0 +1,51 @@
+model_config:
+  simple_composition:
+    final_hidden_size: 512
+    direct_features_input: false
+
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+
+    text_encoder:
+      type: transformer
+      params:
+        bert_model_name: bert-base-uncased
+        hidden_size: 768
+        num_hidden_layers: 12
+        num_attention_heads: 12
+        output_attentions: false
+        output_hidden_states: false
+
+    image_projection:
+      type: linear
+      params:
+        in_dim: 2048
+        out_dim: ${model_config.simple_composition.final_hidden_size}
+
+    text_projection:
+      type: linear
+      params:
+        in_dim: 768
+        out_dim: ${model_config.simple_composition.final_hidden_size}
+
+    compositor:
+      type: tirg
+      params:
+        text_channel: ${model_config.simple_composition.final_hidden_size}
+        img_channel: ${model_config.simple_composition.final_hidden_size}
+
+    norm_layer:
+      normalize_scale: 4.0
+      learn_scale: True
+
+    losses:
+    - type: in_batch_hinge
+      params:
+        margin: 0.2
+        hard: false
