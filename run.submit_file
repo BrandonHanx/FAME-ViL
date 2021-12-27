@@ -25,5 +25,5 @@ requirements = (CUDAGlobalMemoryMb > 4500) && \
                (CUDADeviceName == "GeForce RTX 3090")
 
 queue arguments from (
-  mmf_run config=projects/fashion_comp_retrieval/configs/fashioniq/defaults.yaml model=simple_composition dataset=fashioniq
+  config=$ENV(PWD)/projects/fashion_comp_retrieval/configs/fashioniq/defaults.yaml model=simple_composition dataset=fashioniq
 )

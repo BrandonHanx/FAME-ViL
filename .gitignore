@@ -31,3 +31,6 @@ eggs/
 !tests/data
 wandb/
 logs/
+.netrc
+condor_log/
+docker_stderror
