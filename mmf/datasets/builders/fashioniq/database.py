@@ -31,14 +31,26 @@ class FashionIQDatabase(torch.utils.data.Dataset):
             with PathManager.open(os.path.join(splits_path, json_name), "r") as f:
                 annotations_json = json.load(f)
 
-        for item in annotations_json:
-            data.append(
-                {
-                    "ref_path": item["candidate"] + ".jpg",
-                    "tar_path": item["target"] + ".jpg",
-                    "sentences": ", ".join(item["captions"]),
-                }
-            )
+        if self.splits == "train":
+            for item in annotations_json:
+                data.append(
+                    {
+                        "ref_path": item["candidate"] + ".jpg",
+                        "tar_path": item["target"] + ".jpg",
+                        "sentences": ", ".join(item["captions"]),
+                    }
+                )
+        else:
+            for item in annotations_json:
+                data.append(
+                    {
+                        "ref_path": item["candidate"] + ".jpg",
+                        "tar_path": item["target"] + ".jpg",
+                        "sentences": ", ".join(item["captions"]),
+                        "target_id": item["target_id"],
+                        "fake_data": item["fake_data"],
+                    }
+                )
 
         if len(data) == 0:
             raise RuntimeError("Dataset is empty")

@@ -48,6 +48,7 @@ import collections
 import warnings
 from typing import Dict
 
+import numpy as np
 import torch
 from mmf.common.registry import registry
 from mmf.datasets.processors.processors import EvalAIAnswerProcessor
@@ -1213,6 +1214,80 @@ class RecallAtK_ret(BaseMetric):
             factor = 1
         hits = self._get_RatK_multi(correlations, labels, k, factor)
         ratk = hits.sum().float() / hits.shape[0]
+        return ratk
+
+
+@registry.register_metric("r@k_comp")
+class RecallAtK_comp(BaseMetric):
+    def __init__(self, name="recall@k_comp"):
+        super().__init__(name)
+        self.required_params = ["scores", "targets", "target_id", "fake_data"]
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        k: int,
+        *args,
+        **kwargs,
+    ):
+        comp_embeddings = model_output["scores"]
+        tar_embeddings = model_output["targets"]
+        target_ids = sample_list["target_id"]
+        fake_data = sample_list["fake_data"]
+
+        comp_embeddings = comp_embeddings[~fake_data]
+        q_ids = target_ids[~fake_data]
+
+        _, unique_idx = np.unique(target_ids.cpu().numpy(), return_index=True)
+        unique_idx = torch.tensor(unique_idx, device=comp_embeddings.device)
+
+        tar_embeddings = tar_embeddings[unique_idx]
+        g_ids = target_ids[unique_idx]
+
+        # acclerate sort with topk
+        max_sim, indices = torch.topk(
+            comp_embeddings @ tar_embeddings.t(), k=k, dim=1, largest=True, sorted=True
+        )  # q * k
+        pred_labels = g_ids[indices]  # q * k
+        matches = pred_labels.eq(q_ids.view(-1, 1))  # q * k
+
+        all_cmc = matches[:, :k].cumsum(1)
+        all_cmc[all_cmc > 1] = 1
+        all_cmc = all_cmc.float().mean(0)
+        ratk = all_cmc[k - 1]
+        return ratk
+
+
+@registry.register_metric("r@10_comp")
+class RecallAt10_comp(RecallAtK_comp):
+    def __init__(self):
+        super().__init__("r@10")
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        ratk = super().calculate(sample_list, model_output, 10)
+        return ratk
+
+
+@registry.register_metric("r@50_comp")
+class RecallAt50_comp(RecallAtK_comp):
+    def __init__(self):
+        super().__init__("r@50")
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        ratk = super().calculate(sample_list, model_output, 50)
         return ratk
 
 

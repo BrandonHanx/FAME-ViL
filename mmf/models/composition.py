@@ -212,7 +212,6 @@ class SimpleComposition(BaseComposition):
         output = {
             "scores": comp_ebd,
             "targets": tar_ebd,
-            "text_len": sample_list.input_mask.sum(-1).flatten(),
         }
 
         return output

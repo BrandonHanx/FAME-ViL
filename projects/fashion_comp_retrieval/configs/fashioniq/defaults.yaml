@@ -22,8 +22,8 @@ optimizer:
 
 evaluation:
   metrics:
-    - r@10_retrieval
-    - r@50_retrieval
+    - r@10_comp
+    - r@50_comp
 
 training:
   experiment_name: simple_composition_fashioniq
@@ -33,7 +33,7 @@ training:
   log_interval: 10
   checkpoint_interval: 5620
   evaluation_interval: 562
-  wandb:
-    enabled: true
+  # wandb:
+  #   enabled: true
 
 run_type: train_val
