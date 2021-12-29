@@ -2,7 +2,7 @@
 
 PYTHONHOME="/vol/research/xmodal_dl/mmf-env/bin"
 HOME="/vol/research/xmodal_dl/mmf"
-TIME=`date "+%Y-%m-%d=%H-%M-%S"`
+TIME=`date "+%Y-%m-%d-%H-%M-%S"`
 
 echo $HOME
 echo 'args:' $@

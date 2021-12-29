@@ -760,13 +760,18 @@ class BatchBasedClassificationLoss(nn.Module):
         ref_features = model_output["scores"]
         tar_features = model_output["targets"]
 
-        batch_size = ref_features.size(0)
+        per_gpu_batch_size = ref_features.size(0)
         device = ref_features.device
 
-        pred = ref_features.mm(tar_features.transpose(0, 1))
+        tar_features_all_gpus = gather_tensor_along_batch_with_backward(tar_features)
 
-        labels = torch.arange(0, batch_size).long().to(device)
-        loss = F.cross_entropy(pred, labels)
+        logits = torch.matmul(ref_features, tar_features_all_gpus.transpose(0, 1))
+
+        labels = per_gpu_batch_size * get_rank() + torch.arange(
+            per_gpu_batch_size, device=device
+        )
+
+        loss = F.cross_entropy(logits, labels)
         return loss
 
 

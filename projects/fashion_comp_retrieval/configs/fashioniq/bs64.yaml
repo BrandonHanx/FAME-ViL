@@ -1,0 +1,42 @@
+# FashionIQ data nums: 18000
+
+includes:
+- configs/models/composition/defaults.yaml
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 8430
+    - 14050
+    lr_ratio: 0.1
+    warmup_iterations: 1405
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 2e-4
+    eps: 1e-8
+
+evaluation:
+  metrics:
+    - r@10_comp
+    - r@50_comp
+
+training:
+  experiment_name: simple_composition_fashioniq_bs64
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 22480
+  log_interval: 10
+  checkpoint_interval: 2810
+  evaluation_interval: 281
+  early_stop:
+    criteria: fashioniq/r@50_comp
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
