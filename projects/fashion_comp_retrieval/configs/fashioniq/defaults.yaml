@@ -33,6 +33,9 @@ training:
   log_interval: 10
   checkpoint_interval: 5620
   evaluation_interval: 562
+  early_stop:
+    criteria: fashioniq/r@50_comp
+    minimize: false
   wandb:
     enabled: true
 
