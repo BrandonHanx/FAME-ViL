@@ -143,11 +143,11 @@ class SimpleComposition(BaseComposition):
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
-        bert_params = get_bert_configured_parameters(self.text_encoder, base_lr * 0.1)
+        bert_params = get_bert_configured_parameters(self.text_encoder, base_lr * 0.05)
         backbone_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * 0.1,
+                "lr": base_lr,
             }
         ]
         rest_params = [

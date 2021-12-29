@@ -754,6 +754,22 @@ class InBatchHinge(nn.Module):
         return loss
 
 
+@registry.register_loss("bbc_loss")
+class BatchBasedClassificationLoss(nn.Module):
+    def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
+        ref_features = model_output["scores"]
+        tar_features = model_output["targets"]
+
+        batch_size = ref_features.size(0)
+        device = ref_features.device
+
+        pred = ref_features.mm(tar_features.transpose(0, 1))
+
+        labels = torch.arange(0, batch_size).long().to(device)
+        loss = F.cross_entropy(pred, labels)
+        return loss
+
+
 @registry.register_loss("contrastive_loss")
 class ContrastiveLoss(nn.Module):
     """

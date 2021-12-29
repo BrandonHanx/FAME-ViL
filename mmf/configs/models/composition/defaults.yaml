@@ -45,7 +45,4 @@ model_config:
       learn_scale: True
 
     losses:
-    - type: in_batch_hinge
-      params:
-        margin: 0.2
-        hard: false
+    - type: bbc_loss
