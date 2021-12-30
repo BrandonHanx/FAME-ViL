@@ -1342,7 +1342,7 @@ class RecallAtK_fashioniq(BaseMetric):
             f"toptee_r@{k2}",
             "avg",
         ]
-        values = torch.zeros(7)
+        values = torch.zeros(7, device=comp_embeddings.device)
         values[0] = self._calculate(
             comp_embeddings[dress_index],
             tar_embeddings[dress_index],
