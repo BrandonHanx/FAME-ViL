@@ -1,12 +1,13 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 import importlib
 import logging
+import math
 import os
 import pickle
 import re
 from collections import OrderedDict
 from copy import deepcopy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -17,6 +18,8 @@ from mmf.models.frcnn import GeneralizedRCNN
 from mmf.modules.embeddings import ProjectionEmbedding, TextEmbedding
 from mmf.modules.hf_layers import BertModelJit
 from mmf.modules.layers import Identity
+from mmf.modules.quantize import EMAVectorQuantizer
+from mmf.modules.vae import VAEEncoder
 from mmf.utils.build import build_image_encoder, build_text_encoder
 from mmf.utils.download import download_pretrained_model
 from mmf.utils.file_io import PathManager
@@ -226,6 +229,8 @@ class ImageEncoderFactory(EncoderFactory):
             self.module = Detectron2ResnetImageEncoder(params)
         elif self._type == "frcnn":
             self.module = FRCNNImageEncoder(params)
+        elif self._type == "vqvae_encoder":
+            self.module = VQVAEEncoder(params)
         else:
             raise NotImplementedError("Unknown Image Encoder: %s" % self._type)
 
@@ -235,6 +240,62 @@ class ImageEncoderFactory(EncoderFactory):
 
     def forward(self, image):
         return self.module(image)
+
+
+@registry.register_encoder("vqvae_encoder")
+class VQVAEEncoder(Encoder):
+    @dataclass
+    class Config(Encoder.Config):
+        pretrained_path: str = None
+        resolution: int = 224
+        num_tokens: int = 1024
+        codebook_dim: int = 256
+        attn_resolutions: list = field(default_factory=list)
+        hidden_dim: int = 128
+        in_channels: int = 3
+        ch_mult: list = field(default_factory=list)
+        num_res_blocks: int = 2
+        dropout: int = 0
+        z_channels: int = 256
+        double_z: bool = False
+
+    def __init__(self, config: Config, *args, **kwargs):
+        super().__init__()
+        self.config = config
+        self.image_size = config.resolution
+        self.num_tokens = config.num_tokens
+
+        f = self.image_size / config.attn_resolutions[0]
+        self.num_layers = int(math.log(f) / math.log(2))
+
+        self.encoder = VAEEncoder(
+            hidden_dim=config.hidden_dim,
+            in_channels=config.in_channels,
+            ch_mult=config.ch_mult,
+            num_res_blocks=config.num_res_blocks,
+            attn_resolutions=config.attn_resolutions,
+            dropout=config.dropout,
+            resolution=config.resolution,
+            z_channels=config.z_channels,
+            double_z=config.double_z,
+        )
+
+        self.quantize = EMAVectorQuantizer(
+            num_tokens=config.num_tokens,
+            codebook_dim=config.codebook_dim,
+        )
+        self.quant_conv = torch.nn.Conv2d(config.z_channels, config.codebook_dim, 1)
+
+        if config.pretrained_path is not None:
+            state_dict = torch.load(config.pretrained_path)
+            self.load_state_dict(state_dict)
+            # FIXME: eval mode
+            logger.info(
+                f"Successfully loaded VQVAEEncoder from {config.pretrained_path}"
+            )
+
+    def forward(self, x):
+        return self.quantize(self.quant_conv(self.encoder(x)))
 
 
 # Taken from facebookresearch/mmbt with some modifications
