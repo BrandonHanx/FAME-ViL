@@ -22,8 +22,7 @@ optimizer:
 
 evaluation:
   metrics:
-    - r@10_comp
-    - r@50_comp
+    - r@k_fashioniq
 
 training:
   experiment_name: simple_composition_fashioniq_bs64
@@ -34,7 +33,7 @@ training:
   checkpoint_interval: 2810
   evaluation_interval: 281
   early_stop:
-    criteria: fashioniq/r@50_comp
+    criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
   wandb:
     enabled: true

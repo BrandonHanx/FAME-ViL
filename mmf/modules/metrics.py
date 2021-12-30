@@ -1259,6 +1259,136 @@ class RecallAtK_comp(BaseMetric):
         return ratk
 
 
+@registry.register_metric("r@k_fashioniq")
+class RecallAtK_fashioniq(BaseMetric):
+    """
+    Designed for FashionIQ dataset
+    """
+
+    def __init__(self, name="recall@k_fashioniq"):
+        super().__init__(name)
+        self.required_params = [
+            "scores",
+            "targets",
+            "target_id",
+            "fake_data",
+            "garment_class",
+        ]
+
+    def _get_rk(
+        self,
+        q_ids: Tensor,
+        g_ids: Tensor,
+        comp_embeddings: Tensor,
+        tar_embeddings: Tensor,
+        k: int,
+    ):
+        # acclerate sort with topk
+        max_sim, indices = torch.topk(
+            comp_embeddings @ tar_embeddings.t(), k=k, dim=1, largest=True, sorted=True
+        )  # q * k
+        pred_labels = g_ids[indices]  # q * k
+        matches = pred_labels.eq(q_ids.view(-1, 1))  # q * k
+
+        all_cmc = matches[:, :k].cumsum(1)
+        all_cmc[all_cmc > 1] = 1
+        all_cmc = all_cmc.float().mean(0)
+        ratk = all_cmc[k - 1]
+        return ratk
+
+    def _calculate(
+        self,
+        comp_embeddings: Tensor,
+        tar_embeddings: Tensor,
+        target_ids: Tensor,
+        fake_data: Tensor,
+        k: int,
+    ):
+        comp_embeddings = comp_embeddings[~fake_data]
+        q_ids = target_ids[~fake_data]
+
+        _, unique_idx = np.unique(target_ids.cpu().numpy(), return_index=True)
+        unique_idx = torch.tensor(unique_idx, device=comp_embeddings.device)
+
+        tar_embeddings = tar_embeddings[unique_idx]
+        g_ids = target_ids[unique_idx]
+        return self._get_rk(q_ids, g_ids, comp_embeddings, tar_embeddings, k)
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        k1: int = 10,
+        k2: int = 50,
+        *args,
+        **kwargs,
+    ):
+        comp_embeddings = model_output["scores"]
+        tar_embeddings = model_output["targets"]
+        target_ids = sample_list["target_id"]
+        fake_data = sample_list["fake_data"]
+        garment_class = sample_list["garment_class"]
+
+        dress_index = garment_class == 0
+        shirt_index = garment_class == 1
+        toptee_index = garment_class == 2
+
+        keys = [
+            f"dress_r@{k1}",
+            f"dress_r@{k2}",
+            f"shirt_r@{k1}",
+            f"shirt_r@{k2}",
+            f"toptee_r@{k1}",
+            f"toptee_r@{k2}",
+            "avg",
+        ]
+        values = torch.zeros(7)
+        values[0] = self._calculate(
+            comp_embeddings[dress_index],
+            tar_embeddings[dress_index],
+            target_ids[dress_index],
+            fake_data[dress_index],
+            k1,
+        )
+        values[1] = self._calculate(
+            comp_embeddings[dress_index],
+            tar_embeddings[dress_index],
+            target_ids[dress_index],
+            fake_data[dress_index],
+            k2,
+        )
+        values[2] = self._calculate(
+            comp_embeddings[shirt_index],
+            tar_embeddings[shirt_index],
+            target_ids[shirt_index],
+            fake_data[shirt_index],
+            k1,
+        )
+        values[3] = self._calculate(
+            comp_embeddings[shirt_index],
+            tar_embeddings[shirt_index],
+            target_ids[shirt_index],
+            fake_data[shirt_index],
+            k2,
+        )
+        values[4] = self._calculate(
+            comp_embeddings[toptee_index],
+            tar_embeddings[toptee_index],
+            target_ids[toptee_index],
+            fake_data[toptee_index],
+            k1,
+        )
+        values[5] = self._calculate(
+            comp_embeddings[toptee_index],
+            tar_embeddings[toptee_index],
+            target_ids[toptee_index],
+            fake_data[toptee_index],
+            k2,
+        )
+        values[6] = torch.mean(values[:-1])
+        return dict(zip(keys, values))
+
+
 @registry.register_metric("r@10_comp")
 class RecallAt10_comp(RecallAtK_comp):
     def __init__(self):

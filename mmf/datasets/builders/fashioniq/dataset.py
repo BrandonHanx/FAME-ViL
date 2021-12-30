@@ -63,5 +63,6 @@ class FashionIQDataset(MMFDataset):
         if "fake_data" in sample_info:
             current_sample.target_id = torch.tensor(sample_info['target_id'], dtype=torch.long)
             current_sample.fake_data = torch.tensor(sample_info["fake_data"], dtype=torch.bool)
+            current_sample.garment_class = torch.tensor(sample_info["garment_class"], dtype=torch.long)
 
         return current_sample

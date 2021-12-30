@@ -49,6 +49,7 @@ class FashionIQDatabase(torch.utils.data.Dataset):
                         "sentences": ", ".join(item["captions"]),
                         "target_id": item["target_id"],
                         "fake_data": item["fake_data"],
+                        "garment_class": item["garment_class"],
                     }
                 )
 
