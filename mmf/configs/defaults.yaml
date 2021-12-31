@@ -376,7 +376,7 @@ checkpoint:
     pretrained_state_mapping: {}
 
     # Will save only the last max_to_keep; if -1, saves all eligible checkpoints
-    max_to_keep: -1
+    max_to_keep: 0
 
     # Whether to save git details or not
     save_git_details: true
