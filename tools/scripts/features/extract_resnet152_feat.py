@@ -14,7 +14,7 @@ from PIL import Image
 from torch.autograd import Variable
 
 
-TARGET_IMAGE_SIZE = [448, 448]
+TARGET_IMAGE_SIZE = [224, 224]
 data_transforms = transforms.Compose(
     [
         transforms.Resize(TARGET_IMAGE_SIZE),
@@ -71,10 +71,10 @@ def extract_dataset_pool5(image_dir, save_dir, total_group, group_id, ext_filter
     image_list = glob(image_dir + "/*." + ext_filter)
     image_list = {f: 1 for f in image_list}
     exclude = {}
-    with open("./list") as f:
-        lines = f.readlines()
-        for line in lines:
-            exclude[line.strip("\n").split(os.path.sep)[-1].split(".")[0]] = 1
+    # with open("./list") as f:
+    #     lines = f.readlines()
+    #     for line in lines:
+    #         exclude[line.strip("\n").split(os.path.sep)[-1].split(".")[0]] = 1
     output_files = glob(os.path.join(save_dir, "*.npy"))
     output_dict = {}
     for f in output_files:
@@ -94,9 +94,9 @@ def extract_dataset_pool5(image_dir, save_dir, total_group, group_id, ext_filter
         if (n_im + 1) % 100 == 0:
             print("processing %d / %d" % (n_im + 1, len(image_list)))
         image_name = os.path.basename(impath)
-        image_id = get_image_id(image_name)
-        if image_id % total_group != group_id:
-            continue
+        # image_id = get_image_id(image_name)
+        # if image_id % total_group != group_id:
+        #     continue
 
         feat_name = image_name.replace(ext_filter, "npy")
         save_path = os.path.join(save_dir, feat_name)
