@@ -1,0 +1,54 @@
+# FashionIQ data nums: 18000
+
+includes:
+- configs/models/composition/defaults.yaml
+
+dataset_config:
+  fashioniq:
+    use_images: false
+    use_features: true
+
+model_config:
+  simple_composition:
+    direct_features_input: true
+    image_encoder:
+      type: identity
+      params:
+        in_dim: 2048
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 16860
+    - 28100
+    lr_ratio: 0.1
+    warmup_iterations: 2810
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 2e-4
+    eps: 1e-8
+
+evaluation:
+  metrics:
+    - r@k_fashioniq
+
+training:
+  experiment_name: simple_composition_fashioniq_152_features
+  batch_size: 32
+  lr_scheduler: true
+  max_updates: 44960
+  log_interval: 10
+  checkpoint_interval: 5620
+  evaluation_interval: 562
+  early_stop:
+    criteria: fashioniq/r@k_fashioniq/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val

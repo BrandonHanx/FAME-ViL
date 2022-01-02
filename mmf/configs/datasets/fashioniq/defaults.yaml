@@ -18,6 +18,13 @@ dataset_config:
         - FashionIQ/captions
         test:
         - FashionIQ/captions
+      features:
+        train:
+        - FashionIQ/features
+        val:
+        - FashionIQ/features
+        test:
+        - FashionIQ/features
       processors:
         text_processor:
           type: bert_tokenizer

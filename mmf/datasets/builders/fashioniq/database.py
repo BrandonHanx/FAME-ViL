@@ -35,8 +35,8 @@ class FashionIQDatabase(torch.utils.data.Dataset):
             for item in annotations_json:
                 data.append(
                     {
-                        "ref_path": item["candidate"] + ".jpg",
-                        "tar_path": item["target"] + ".jpg",
+                        "ref_path": item["candidate"],
+                        "tar_path": item["target"],
                         "sentences": ", ".join(item["captions"]),
                     }
                 )
@@ -44,8 +44,8 @@ class FashionIQDatabase(torch.utils.data.Dataset):
             for item in annotations_json:
                 data.append(
                     {
-                        "ref_path": item["candidate"] + ".jpg",
-                        "tar_path": item["target"] + ".jpg",
+                        "ref_path": item["candidate"],
+                        "tar_path": item["target"],
                         "sentences": ", ".join(item["captions"]),
                         "target_id": item["target_id"],
                         "fake_data": item["fake_data"],

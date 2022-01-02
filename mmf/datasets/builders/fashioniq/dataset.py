@@ -29,11 +29,12 @@ class FashionIQDataset(MMFDataset):
 
     def init_processors(self):
         super().init_processors()
-        # Assign transforms to the image_db
-        if self._dataset_type == "train":
-            self.image_db.transform = self.train_image_processor
-        else:
-            self.image_db.transform = self.eval_image_processor
+        if self._use_images:
+            # Assign transforms to the image_db
+            if self._dataset_type == "train":
+                self.image_db.transform = self.train_image_processor
+            else:
+                self.image_db.transform = self.eval_image_processor
 
     def _get_valid_text_attribute(self, sample_info):
         if "captions" in sample_info:
@@ -55,8 +56,12 @@ class FashionIQDataset(MMFDataset):
         current_sample.text = processed_sentence["text"]
         if "input_ids" in processed_sentence:
             current_sample.update(processed_sentence)
-        current_sample.ref_image = self.image_db.from_path(sample_info["ref_path"])["images"][0]
-        current_sample.tar_image = self.image_db.from_path(sample_info["tar_path"])["images"][0]
+        if self._use_images:
+            current_sample.ref_image = self.image_db.from_path(sample_info["ref_path"] + ".jpg")["images"][0]
+            current_sample.tar_image = self.image_db.from_path(sample_info["tar_path"] + ".jpg")["images"][0]
+        else:
+            current_sample.ref_image = self.features_db.from_path(sample_info["ref_path"] + ".npy")["image_feature_0"]
+            current_sample.tar_image = self.features_db.from_path(sample_info["tar_path"] + ".npy")["image_feature_0"]
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = None  # Dummy for Loss
 
