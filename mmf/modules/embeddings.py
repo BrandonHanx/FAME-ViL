@@ -420,7 +420,7 @@ class BertVisioLinguisticEmbeddings(BertEmbeddings):
 
     def forward(
         self,
-        input_ids: Tensor,
+        input_ids: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         visual_embeddings: Optional[Tensor] = None,
         visual_embeddings_type: Optional[Tensor] = None,
@@ -432,25 +432,36 @@ class BertVisioLinguisticEmbeddings(BertEmbeddings):
         visual_embedding = [batch_size, image_feature_length, image_feature_dim]
         image_text_alignment = [batch_size, image_feature_length, alignment_dim]
         """
+        use_txt = False
+        use_vis = False
 
         # text embeddings
-        text_embeddings = self.encode_text(input_ids, token_type_ids=token_type_ids)
+        if input_ids is not None and token_type_ids is not None:
+            use_txt = True
+            text_embeddings = self.encode_text(input_ids, token_type_ids=token_type_ids)
 
         # visual embeddings
         if visual_embeddings is not None and visual_embeddings_type is not None:
+            use_vis = True
             v_embeddings = self.encode_image(
                 visual_embeddings,
                 visual_embeddings_type=visual_embeddings_type,
                 image_text_alignment=image_text_alignment,
             )
 
-            # Concate the two:
-            embeddings = torch.cat(
-                (text_embeddings, v_embeddings), dim=1
-            )  # concat the visual embeddings after the attentions
-
+        if use_txt:
+            if use_vis:
+                # Concate the two:
+                embeddings = torch.cat(
+                    (text_embeddings, v_embeddings), dim=1
+                )  # concat the visual embeddings after the attentions
+            else:
+                embeddings = text_embeddings
         else:
-            embeddings = text_embeddings
+            if use_vis:
+                embeddings = v_embeddings
+            else:
+                raise ValueError
 
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)

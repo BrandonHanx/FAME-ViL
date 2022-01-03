@@ -1,0 +1,275 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+
+import os
+from typing import Dict, List, Optional, Tuple
+
+import torch
+from mmf.common.registry import registry
+from mmf.models import BaseModel
+from mmf.models.composition import NormalizationLayer
+from mmf.modules.embeddings import BertVisioLinguisticEmbeddings
+from mmf.modules.hf_layers import BertEncoderJit
+from mmf.utils.configuration import get_mmf_cache_dir
+from mmf.utils.modeling import get_optimizer_parameters_for_bert
+from mmf.utils.transform import (
+    transform_to_batch_sequence,
+    transform_to_batch_sequence_dim,
+)
+from omegaconf import OmegaConf
+from torch import Tensor, nn
+from transformers.modeling_bert import (
+    BertConfig,
+    BertPooler,
+    BertPreTrainedModel,
+)
+
+
+class FashionViLBase(BertPreTrainedModel):
+    def __init__(
+        self,
+        config,
+        visual_embedding_dim=2048,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
+        super().__init__(config)
+        self.config = config
+
+        config.visual_embedding_dim = visual_embedding_dim
+        config.output_attentions = output_attentions
+        config.output_hidden_states = output_hidden_states
+
+        self.embeddings = BertVisioLinguisticEmbeddings(config)
+        self.encoder = BertEncoderJit(config)
+        self.pooler = BertPooler(config)
+        self.output_attentions = self.config.output_attentions
+        self.output_hidden_states = self.config.output_hidden_states
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        visual_embeddings: Optional[Tensor] = None,
+        visual_embeddings_type: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor, List[Tensor]]:
+
+        extended_attention_mask = None
+        if attention_mask is not None:
+            extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+            if not torch.jit.is_scripting():
+                extended_attention_mask = extended_attention_mask.to(
+                    dtype=next(self.parameters()).dtype
+                )  # fp16 compatibility
+            extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+
+        embedding_output = self.embeddings(
+            input_ids,
+            token_type_ids,
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+        )
+
+        encoded_layers = self.encoder(embedding_output, extended_attention_mask)
+        sequence_output = encoded_layers[0]
+        pooled_output = self.pooler(sequence_output)
+        attn_data_list = []
+
+        if not torch.jit.is_scripting():
+            if self.output_attentions:
+                attn_data_list = encoded_layers[1:]
+        else:
+            assert (
+                not self.output_attentions
+            ), "output_attentions not supported in script mode"
+
+        return sequence_output, pooled_output, attn_data_list
+
+
+class FashionViLForPretraining(nn.Module):
+    pass
+
+
+class FashionViLForComposition(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.output_attentions = self.config.output_attentions
+        self.output_hidden_states = self.config.output_hidden_states
+
+        self.bert_model_name = getattr(
+            self.config, "bert_model_name", "bert-base-uncased"
+        )
+        self.bert_config = BertConfig.from_dict(
+            OmegaConf.to_container(self.config, resolve=True)
+        )
+        self.bert = FashionViLBase.from_pretrained(
+            self.config.bert_model_name,
+            config=self.bert_config,
+            cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
+            visual_embedding_dim=self.config.visual_embedding_dim,
+            output_attentions=self.config.output_attentions,
+            output_hidden_states=self.config.output_hidden_states,
+        )
+        self.norm_layer = NormalizationLayer()
+
+    def get_tar_image_embedding(
+        self,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        visual_embeddings, _, _ = self.bert(
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+            attention_mask=attention_mask,
+        )
+        visual_embeddings = visual_embeddings.mean(dim=1)
+        visual_embeddings = self.norm_layer(visual_embeddings)
+        return visual_embeddings
+
+    def get_comp_embedding(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Tensor,
+    ) -> Tensor:
+        comp_embeddings, _, _ = self.bert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+            attention_mask=attention_mask,
+        )
+        num_visual_tokens = visual_embeddings.shape[1]
+        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        comp_embeddings = self.norm_layer(comp_embeddings)
+        return comp_embeddings
+
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        tar_visual_embeddings: Tensor,
+        tar_visual_embeddings_type: Tensor,
+        ref_visual_embeddings: Tensor,
+        ref_visual_embeddings_type: Tensor,
+        comp_attention_mask: Tensor,
+        visual_attention_mask: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        tar_embeddings = self.get_tar_image_embedding(
+            tar_visual_embeddings, tar_visual_embeddings_type, visual_attention_mask
+        )
+        comp_embeddings = self.get_comp_embedding(
+            input_ids,
+            token_type_ids,
+            ref_visual_embeddings,
+            ref_visual_embeddings_type,
+            comp_attention_mask,
+        )
+        output_dict = {
+            "scores": comp_embeddings,
+            "targets": tar_embeddings,
+        }
+        return output_dict
+
+
+@registry.register_model("fashionvil")
+class FashionViL(BaseModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.config = config
+        self.training_head_type = self.config.training_head_type
+
+    @classmethod
+    def config_path(cls):
+        return "configs/models/fashionvil/defaults.yaml"
+
+    def build(self):
+        if self.training_head_type == "pretraining":
+            self.model = FashionViLForPretraining(self.config)
+        elif self.training_head_type == "composition":
+            self.model = FashionViLForComposition(self.config)
+        else:
+            raise NotImplementedError
+
+        if self.config.special_visual_initialize:
+            self.model.bert.embeddings.initialize_visual_from_pretrained()
+
+        if getattr(self.config, "freeze_base", False):
+            for p in self.model.bert.parameters():
+                p.requires_grad = False
+
+    def flatten(
+        self,
+        sample_list: Dict[str, Tensor],
+        to_be_flattened: List[str],
+        to_be_flattened_dim: List[str],
+    ) -> Dict[str, Tensor]:
+        for key in to_be_flattened:
+            # Make sure these keys are present or otherwise set these keys to None
+            sample_list[key] = transform_to_batch_sequence(sample_list[key])
+        for key in to_be_flattened_dim:
+            sample_list[key] = transform_to_batch_sequence_dim(sample_list[key])
+        return sample_list
+
+    def add_post_flatten_params(
+        self, sample_list: Dict[str, Tensor]
+    ) -> Dict[str, Tensor]:
+        b, l, _ = sample_list["ref_image"].shape
+        device = sample_list["ref_image"].device
+
+        sample_list["tar_visual_embeddings_type"] = torch.zeros(
+            (b, l), device=device
+        ).long()
+        sample_list["ref_visual_embeddings_type"] = torch.zeros(
+            (b, l), device=device
+        ).long()
+        sample_list["comp_attention_mask"] = torch.cat(
+            (sample_list["input_mask"], torch.ones((b, l), device=device).long()),
+            dim=-1,
+        )
+        sample_list["visual_attention_mask"] = torch.ones((b, l), device=device).long()
+        return sample_list
+
+    def get_optimizer_parameters(self, config):
+        return get_optimizer_parameters_for_bert(self.model, config)
+
+    def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        to_be_flattened = ["input_ids", "segment_ids"]
+        to_be_flattened_dim = ["ref_image", "tar_image"]
+
+        # We want to convert everything into: batch x sequence_length x (dim).
+        flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
+        return flattened
+
+    def update_sample_list_based_on_head(
+        self, sample_list: Dict[str, Tensor]
+    ) -> Dict[str, Tensor]:
+        # We don't need image mask here coz we are using grid features
+        return sample_list
+
+    def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        return sample_list
+
+    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        # sample_list = self.update_sample_list_based_on_head(sample_list)
+        # sample_list = self.add_custom_params(sample_list)
+        sample_list = self.flatten_for_bert(sample_list)
+        sample_list = self.add_post_flatten_params(sample_list)
+
+        output_dict = self.model(
+            input_ids=sample_list["input_ids"],
+            token_type_ids=sample_list["segment_ids"],
+            tar_visual_embeddings=sample_list["tar_image"],
+            tar_visual_embeddings_type=sample_list["tar_visual_embeddings_type"],
+            ref_visual_embeddings=sample_list["ref_image"],
+            ref_visual_embeddings_type=sample_list["ref_visual_embeddings_type"],
+            comp_attention_mask=sample_list["comp_attention_mask"],
+            visual_attention_mask=sample_list["visual_attention_mask"],
+        )
+
+        return output_dict
