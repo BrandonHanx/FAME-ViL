@@ -15,16 +15,22 @@ model_config:
     losses:
       - type: bbc_loss
 
+# scheduler:
+#   type: multi_step
+#   params:
+#     use_warmup: true
+#     lr_steps:
+#     - 16860
+#     - 28100
+#     lr_ratio: 0.1
+#     warmup_iterations: 2810
+#     warmup_factor: 0.25
+
 scheduler:
-  type: multi_step
+  type: warmup_linear
   params:
-    use_warmup: true
-    lr_steps:
-    - 16860
-    - 28100
-    lr_ratio: 0.1
-    warmup_iterations: 2810
-    warmup_factor: 0.25
+    num_warmup_steps: 4496
+    num_training_steps: 44960
 
 optimizer:
   type: adam_w

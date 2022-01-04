@@ -10,20 +10,20 @@ error  = condor_log/c$(cluster).p$(process).error
 environment = "mount=/vol/research/xmodal_dl/"
 
 +CanCheckpoint = True
-+GPUMem = 10000
++GPUMem = 20000
 +JobRunTime = 10
 
 should_transfer_files = True
 stream_output = True
 
-request_GPUs     = 4
+request_GPUs     = 1
 request_CPUs     = 1
 request_memory = 16G
 requirements = (CUDAGlobalMemoryMb > 4500) && \
                (HasDocker) && \
                (CUDACapability > 2.0) && \
-               (CUDADeviceName == "GeForce RTX 2080 Ti")
+               (CUDADeviceName == "GeForce RTX 3090")
 
 queue arguments from (
-  config=$ENV(PWD)/projects/fashion_comp_retrieval/configs/fashioniq/vqvae_encoder.yaml model=simple_composition dataset=fashioniq
+  config=$ENV(PWD)/projects/fashion_comp_retrieval/configs/fashioniq/fashionvil.yaml model=fashionvil dataset=fashioniq
 )
