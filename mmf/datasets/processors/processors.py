@@ -69,6 +69,7 @@ Example::
 import collections
 import copy
 import logging
+import math
 import os
 import random
 import re
@@ -1664,6 +1665,74 @@ class MaskedRegionProcessor(BaseProcessor):
                 # no masking token (will be ignored by loss function later)
                 image_labels.append(-1)
         return torch.tensor(image_labels, dtype=torch.long)
+
+
+@registry.register_processor("blockwise_masked_patch")
+class BlockWiseMaskedPatchProcessor(BaseProcessor):
+    """
+    Inspired by BeiT
+    from https://github.com/microsoft/unilm/blob/master/beit/masking_generator.py
+    """
+
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+
+        input_size = config.get("input_size", 7)
+        if not isinstance(input_size, tuple):
+            input_size = (input_size,) * 2
+        self.height, self.width = input_size
+        self.num_patches = self.height * self.width
+
+        self.num_masking_patches = config.get("num_masking_patches", 20)
+        self.min_num_patches = config.get("min_num_patches", 4)
+        self.max_num_patches = config.get("max_num_patches", 16)
+
+        min_aspect = config.get("min_aspect", 0.3)
+        max_aspect = config.get("max_aspect", 1 / min_aspect)
+        self.log_aspect_ratio = (math.log(min_aspect), math.log(max_aspect))
+
+    def get_shape(self):
+        return self.height, self.width
+
+    def _mask(self, mask, max_mask_patches):
+        delta = 0
+        for attempt in range(10):
+            target_area = random.uniform(self.min_num_patches, max_mask_patches)
+            aspect_ratio = math.exp(random.uniform(*self.log_aspect_ratio))
+            h = int(round(math.sqrt(target_area * aspect_ratio)))
+            w = int(round(math.sqrt(target_area / aspect_ratio)))
+            if w < self.width and h < self.height:
+                top = random.randint(0, self.height - h)
+                left = random.randint(0, self.width - w)
+
+                num_masked = mask[top : top + h, left : left + w].sum()
+                # Overlap
+                if 0 < h * w - num_masked <= max_mask_patches:
+                    for i in range(top, top + h):
+                        for j in range(left, left + w):
+                            if mask[i, j] == 0:
+                                mask[i, j] = 1
+                                delta += 1
+
+                if delta > 0:
+                    break
+        return delta
+
+    def __call__(self, x):
+        assert self.height * self.width == x.shape[0]
+        mask = torch.zeros(shape=self.get_shape(), dtype=torch.long, device=x.device)
+        mask_count = 0
+        while mask_count < self.num_masking_patches:
+            max_mask_patches = self.num_masking_patches - mask_count
+            max_mask_patches = min(max_mask_patches, self.max_num_patches)
+
+            delta = self._mask(mask, max_mask_patches)
+            if delta == 0:
+                break
+            else:
+                mask_count += delta
+        mask[mask == 0] = -1
+        return mask.view(-1)
 
 
 @registry.register_processor("transformer_bbox")
