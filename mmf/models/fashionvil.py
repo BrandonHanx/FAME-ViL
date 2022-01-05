@@ -147,6 +147,7 @@ class FashionViLForComposition(nn.Module):
         self.config = config
         self.output_attentions = self.config.output_attentions
         self.output_hidden_states = self.config.output_hidden_states
+        self.bypass_transformer = self.config.bypass_transformer
 
         self.bert_model_name = getattr(
             self.config, "bert_model_name", "bert-base-uncased"
@@ -170,11 +171,14 @@ class FashionViLForComposition(nn.Module):
         visual_embeddings_type: Tensor,
         attention_mask: Optional[Tensor] = None,
     ) -> Tensor:
-        visual_embeddings, _, _ = self.bert(
-            visual_embeddings=visual_embeddings,
-            visual_embeddings_type=visual_embeddings_type,
-            attention_mask=attention_mask,
-        )
+        if self.bypass_transformer:
+            visual_embeddings = self.bert.embeddings.projection(visual_embeddings)
+        else:
+            visual_embeddings, _, _ = self.bert(
+                visual_embeddings=visual_embeddings,
+                visual_embeddings_type=visual_embeddings_type,
+                attention_mask=attention_mask,
+            )
         visual_embeddings = visual_embeddings.mean(dim=1)
         visual_embeddings = self.norm_layer(visual_embeddings)
         return visual_embeddings

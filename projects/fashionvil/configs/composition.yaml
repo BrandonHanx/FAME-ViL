@@ -12,6 +12,7 @@ model_config:
   fashionvil:
     bert_model_name: bert-base-uncased
     training_head_type: composition
+    bypass_transformer: false
     losses:
       - type: bbc_loss
 
@@ -54,6 +55,6 @@ run_type: train_val
 
 checkpoint:
   resume_pretrained: true
-  resume_file: save/fashionvil_itm_facad/current.ckpt
+  resume_file: save/fashionvil_itm_facad/best.ckpt
   pretrained_state_mapping:
     model.bert: model.bert
