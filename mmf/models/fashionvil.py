@@ -141,6 +141,83 @@ class FashionViLForClassification(nn.Module):
         return output_dict
 
 
+class FashionViLForContrastive(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.output_attentions = self.config.output_attentions
+        self.output_hidden_states = self.config.output_hidden_states
+
+        self.bert_model_name = getattr(
+            self.config, "bert_model_name", "bert-base-uncased"
+        )
+        self.bert_config = BertConfig.from_dict(
+            OmegaConf.to_container(self.config, resolve=True)
+        )
+        self.bert = FashionViLBase.from_pretrained(
+            self.config.bert_model_name,
+            config=self.bert_config,
+            cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
+            visual_embedding_dim=self.config.visual_embedding_dim,
+            output_attentions=self.config.output_attentions,
+            output_hidden_states=self.config.output_hidden_states,
+        )
+        self.norm_layer = NormalizationLayer()
+
+    def get_image_embedding(
+        self,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        visual_embeddings, _, _ = self.bert(
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+            attention_mask=attention_mask,
+        )
+        visual_embeddings = visual_embeddings.mean(dim=1)
+        visual_embeddings = self.norm_layer(visual_embeddings)
+        return visual_embeddings
+
+    def get_text_embedding(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        attention_mask: Tensor,
+    ) -> Tensor:
+        text_embeddings, _, _ = self.bert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+        )
+        text_embeddings = text_embeddings[:, 0]
+        text_embeddings = self.norm_layer(text_embeddings)
+        return text_embeddings
+
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        text_attention_mask: Tensor,
+        visual_attention_mask: Optional[Tensor] = None,
+    ) -> Dict[str, Tensor]:
+        visual_embeddings = self.get_image_embedding(
+            visual_embeddings, visual_embeddings_type, visual_attention_mask
+        )
+        text_embeddings = self.get_text_embedding(
+            input_ids,
+            token_type_ids,
+            text_attention_mask,
+        )
+        output_dict = {
+            "scores": visual_embeddings,
+            "targets": text_embeddings,
+        }
+        return output_dict
+
+
 class FashionViLForComposition(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -249,6 +326,8 @@ class FashionViL(BaseModel):
             self.model = FashionViLForClassification(self.config)
         elif self.training_head_type == "composition":
             self.model = FashionViLForComposition(self.config)
+        elif self.training_head_type == "contrastive":
+            self.model = FashionViLForContrastive(self.config)
         else:
             raise NotImplementedError
 
@@ -298,10 +377,14 @@ class FashionViL(BaseModel):
             sample_list["visual_embeddings_type"] = torch.zeros(
                 (b, l), device=device
             ).long()
-            sample_list["attention_mask"] = torch.cat(
-                (sample_list["input_mask"], torch.ones((b, l), device=device).long()),
-                dim=-1,
-            )
+            if self.training_head_type == "classification":
+                sample_list["attention_mask"] = torch.cat(
+                    (
+                        sample_list["input_mask"],
+                        torch.ones((b, l), device=device).long(),
+                    ),
+                    dim=-1,
+                )
         return sample_list
 
     def get_optimizer_parameters(self, config):
@@ -343,6 +426,14 @@ class FashionViL(BaseModel):
                 ref_visual_embeddings_type=sample_list["ref_visual_embeddings_type"],
                 comp_attention_mask=sample_list["comp_attention_mask"],
                 visual_attention_mask=sample_list["visual_attention_mask"],
+            )
+        elif self.training_head_type == "contrastive":
+            output_dict = self.model(
+                input_ids=sample_list["input_ids"],
+                token_type_ids=sample_list["segment_ids"],
+                visual_embeddings=sample_list["image"],
+                visual_embeddings_type=sample_list["visual_embeddings_type"],
+                text_attention_mask=sample_list["input_mask"],
             )
         else:
             output_dict = self.model(
