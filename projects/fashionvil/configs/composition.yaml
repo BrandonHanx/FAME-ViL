@@ -37,7 +37,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq
+  experiment_name: fashionvil_composition_fashioniq_pretrained
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960
@@ -51,3 +51,9 @@ training:
     enabled: true
 
 run_type: train_val
+
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/fashionvil_itm_facad/current.ckpt
+  pretrained_state_mapping:
+    model.bert: model.bert
