@@ -1,0 +1,69 @@
+# FACAD data nums: 92342
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  facad:
+    use_images: false
+    use_features: true
+    false_caption: true
+    features:
+        train:
+        - FACAD/train_features
+        val:
+        - FACAD/test_features
+        test:
+        - FACAD/test_features
+    annotations:
+        train:
+        - FACAD/train_info.json
+        val:
+        - FACAD/test_info.json
+        test:
+        - FACAD/test_info.json
+
+model_config:
+  fashionvil:
+    bert_model_name: bert-base-uncased
+    training_head_type: classification
+    num_labels: 2
+    losses:
+      - type: cross_entropy
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 43260
+    - 86520
+    lr_ratio: 0.1
+    warmup_iterations: 7210
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 5e-5
+    eps: 1e-8
+
+evaluation:
+  metrics:
+    - accuracy
+
+training:
+  experiment_name: fashionvil_itm_facad
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 115360
+  log_interval: 10
+  checkpoint_interval: 14420
+  evaluation_interval: 1442
+  early_stop:
+    criteria: facad/accuracy
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val

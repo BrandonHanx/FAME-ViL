@@ -3,6 +3,8 @@ dataset_config:
       data_dir: ${env.data_dir}/datasets
       use_images: true
       use_features: false
+      false_caption: false
+      false_caption_probability: 0.5
       images:
         train:
         - FACAD/train
@@ -17,6 +19,13 @@ dataset_config:
         - FACAD/val_info.json
         test:
         - FACAD/test_info.json
+      features:
+        train:
+        - FACAD/train_features
+        val:
+        - FACAD/val_features
+        test:
+        - FACAD/test_features
       processors:
         text_processor:
           type: bert_tokenizer

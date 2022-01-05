@@ -21,6 +21,7 @@ from transformers.modeling_bert import (
     BertConfig,
     BertPooler,
     BertPreTrainedModel,
+    BertPredictionHeadTransform,
 )
 
 
@@ -89,6 +90,55 @@ class FashionViLBase(BertPreTrainedModel):
 
 class FashionViLForPretraining(nn.Module):
     pass
+
+
+class FashionViLForClassification(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.output_attentions = self.config.output_attentions
+        self.output_hidden_states = self.config.output_hidden_states
+        self.num_labels = self.config.num_labels
+
+        self.bert_model_name = getattr(
+            self.config, "bert_model_name", "bert-base-uncased"
+        )
+        self.bert_config = BertConfig.from_dict(
+            OmegaConf.to_container(self.config, resolve=True)
+        )
+        self.bert = FashionViLBase.from_pretrained(
+            self.config.bert_model_name,
+            config=self.bert_config,
+            cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
+            visual_embedding_dim=self.config.visual_embedding_dim,
+            output_attentions=self.config.output_attentions,
+            output_hidden_states=self.config.output_hidden_states,
+        )
+        self.dropout = nn.Dropout(self.bert.config.hidden_dropout_prob)
+        self.classifier = nn.Sequential(
+            BertPredictionHeadTransform(self.bert.config),
+            nn.Linear(self.bert.config.hidden_size, self.config.num_labels),
+        )
+
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Tensor,
+    ) -> Dict[str, Tensor]:
+        _, pooled_output, _ = self.bert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+            attention_mask=attention_mask,
+        )
+        logits = self.classifier(pooled_output)
+        reshaped_logits = logits.contiguous().view(-1, self.num_labels)
+        output_dict = {"scores": reshaped_logits}
+        return output_dict
 
 
 class FashionViLForComposition(nn.Module):
@@ -191,6 +241,8 @@ class FashionViL(BaseModel):
     def build(self):
         if self.training_head_type == "pretraining":
             self.model = FashionViLForPretraining(self.config)
+        elif self.training_head_type == "classification":
+            self.model = FashionViLForClassification(self.config)
         elif self.training_head_type == "composition":
             self.model = FashionViLForComposition(self.config)
         else:
@@ -219,20 +271,33 @@ class FashionViL(BaseModel):
     def add_post_flatten_params(
         self, sample_list: Dict[str, Tensor]
     ) -> Dict[str, Tensor]:
-        b, l, _ = sample_list["ref_image"].shape
-        device = sample_list["ref_image"].device
+        if self.training_head_type == "composition":
+            b, l, _ = sample_list["ref_image"].shape
+            device = sample_list["ref_image"].device
 
-        sample_list["tar_visual_embeddings_type"] = torch.zeros(
-            (b, l), device=device
-        ).long()
-        sample_list["ref_visual_embeddings_type"] = torch.zeros(
-            (b, l), device=device
-        ).long()
-        sample_list["comp_attention_mask"] = torch.cat(
-            (sample_list["input_mask"], torch.ones((b, l), device=device).long()),
-            dim=-1,
-        )
-        sample_list["visual_attention_mask"] = torch.ones((b, l), device=device).long()
+            sample_list["tar_visual_embeddings_type"] = torch.zeros(
+                (b, l), device=device
+            ).long()
+            sample_list["ref_visual_embeddings_type"] = torch.zeros(
+                (b, l), device=device
+            ).long()
+            sample_list["comp_attention_mask"] = torch.cat(
+                (sample_list["input_mask"], torch.ones((b, l), device=device).long()),
+                dim=-1,
+            )
+            sample_list["visual_attention_mask"] = torch.ones(
+                (b, l), device=device
+            ).long()
+        else:
+            b, l, _ = sample_list["image"].shape
+            device = sample_list["image"].device
+            sample_list["visual_embeddings_type"] = torch.zeros(
+                (b, l), device=device
+            ).long()
+            sample_list["attention_mask"] = torch.cat(
+                (sample_list["input_mask"], torch.ones((b, l), device=device).long()),
+                dim=-1,
+            )
         return sample_list
 
     def get_optimizer_parameters(self, config):
@@ -240,7 +305,10 @@ class FashionViL(BaseModel):
 
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
-        to_be_flattened_dim = ["ref_image", "tar_image"]
+        if self.training_head_type == "composition":
+            to_be_flattened_dim = ["ref_image", "tar_image"]
+        else:
+            to_be_flattened_dim = ["image"]
 
         # We want to convert everything into: batch x sequence_length x (dim).
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
@@ -261,15 +329,24 @@ class FashionViL(BaseModel):
         sample_list = self.flatten_for_bert(sample_list)
         sample_list = self.add_post_flatten_params(sample_list)
 
-        output_dict = self.model(
-            input_ids=sample_list["input_ids"],
-            token_type_ids=sample_list["segment_ids"],
-            tar_visual_embeddings=sample_list["tar_image"],
-            tar_visual_embeddings_type=sample_list["tar_visual_embeddings_type"],
-            ref_visual_embeddings=sample_list["ref_image"],
-            ref_visual_embeddings_type=sample_list["ref_visual_embeddings_type"],
-            comp_attention_mask=sample_list["comp_attention_mask"],
-            visual_attention_mask=sample_list["visual_attention_mask"],
-        )
+        if self.training_head_type == "composition":
+            output_dict = self.model(
+                input_ids=sample_list["input_ids"],
+                token_type_ids=sample_list["segment_ids"],
+                tar_visual_embeddings=sample_list["tar_image"],
+                tar_visual_embeddings_type=sample_list["tar_visual_embeddings_type"],
+                ref_visual_embeddings=sample_list["ref_image"],
+                ref_visual_embeddings_type=sample_list["ref_visual_embeddings_type"],
+                comp_attention_mask=sample_list["comp_attention_mask"],
+                visual_attention_mask=sample_list["visual_attention_mask"],
+            )
+        else:
+            output_dict = self.model(
+                input_ids=sample_list["input_ids"],
+                token_type_ids=sample_list["segment_ids"],
+                visual_embeddings=sample_list["image"],
+                visual_embeddings_type=sample_list["visual_embeddings_type"],
+                attention_mask=sample_list["attention_mask"],
+            )
 
         return output_dict
