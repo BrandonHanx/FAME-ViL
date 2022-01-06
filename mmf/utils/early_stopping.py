@@ -26,7 +26,7 @@ class EarlyStopping:
         self.checkpoint = checkpoint_instance
         self.early_stop_criteria = early_stop_criteria
 
-        if "val" not in self.early_stop_criteria:
+        if "val/" not in self.early_stop_criteria:
             self.early_stop_criteria = f"val/{self.early_stop_criteria}"
 
         self.best_monitored_value = -np.inf if not minimize else np.inf
