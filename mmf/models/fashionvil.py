@@ -43,8 +43,10 @@ class FashionViLBase(BertPreTrainedModel):
         self.embeddings = BertVisioLinguisticEmbeddings(config)
         self.encoder = BertEncoderJit(config)
         self.pooler = BertPooler(config)
-        self.output_attentions = self.config.output_attentions
-        self.output_hidden_states = self.config.output_hidden_states
+        self.output_attentions = config.output_attentions
+        self.output_hidden_states = config.output_hidden_states
+        self.bypass_transformer = config.bypass_transformer
+
         self.init_weights()
 
     def forward(
@@ -87,6 +89,49 @@ class FashionViLBase(BertPreTrainedModel):
 
         return sequence_output, pooled_output, attn_data_list
 
+    def get_joint_embedding(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Tensor,
+    ) -> Tuple[Tensor, Tensor, List[Tensor]]:
+        return self.forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            visual_embeddings=visual_embeddings,
+            visual_embeddings_type=visual_embeddings_type,
+            attention_mask=attention_mask,
+        )
+
+    def get_image_embedding(
+        self,
+        visual_embeddings: Tensor,
+        visual_embeddings_type: Tensor,
+        attention_mask: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor, List[Tensor]]:
+        if self.bypass_transformer:
+            return self.embeddings.projection(visual_embeddings)
+        else:
+            return self.forward(
+                visual_embeddings=visual_embeddings,
+                visual_embeddings_type=visual_embeddings_type,
+                attention_mask=attention_mask,
+            )
+
+    def get_text_embedding(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        attention_mask: Tensor,
+    ) -> Tuple[Tensor, Tensor, List[Tensor]]:
+        return self.forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+        )
+
 
 class FashionViLForPretraining(nn.Module):
     pass
@@ -95,29 +140,23 @@ class FashionViLForPretraining(nn.Module):
 class FashionViLForClassification(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
-        self.output_attentions = self.config.output_attentions
-        self.output_hidden_states = self.config.output_hidden_states
-        self.num_labels = self.config.num_labels
+        bert_model_name = getattr(config, "bert_model_name", "bert-base-uncased")
+        bert_config = BertConfig.from_dict(OmegaConf.to_container(config, resolve=True))
 
-        self.bert_model_name = getattr(
-            self.config, "bert_model_name", "bert-base-uncased"
-        )
-        self.bert_config = BertConfig.from_dict(
-            OmegaConf.to_container(self.config, resolve=True)
-        )
+        self.config = config
+        self.num_labels = config.num_labels
         self.bert = FashionViLBase.from_pretrained(
-            self.config.bert_model_name,
-            config=self.bert_config,
+            bert_model_name,
+            config=bert_config,
             cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
-            visual_embedding_dim=self.config.visual_embedding_dim,
-            output_attentions=self.config.output_attentions,
-            output_hidden_states=self.config.output_hidden_states,
+            visual_embedding_dim=config.visual_embedding_dim,
+            output_attentions=config.output_attentions,
+            output_hidden_states=config.output_hidden_states,
         )
         self.dropout = nn.Dropout(self.bert.config.hidden_dropout_prob)
         self.classifier = nn.Sequential(
             BertPredictionHeadTransform(self.bert.config),
-            nn.Linear(self.bert.config.hidden_size, self.config.num_labels),
+            nn.Linear(self.bert.config.hidden_size, config.num_labels),
         )
 
     def forward(
@@ -128,12 +167,12 @@ class FashionViLForClassification(nn.Module):
         visual_embeddings_type: Tensor,
         attention_mask: Tensor,
     ) -> Dict[str, Tensor]:
-        _, pooled_output, _ = self.bert(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            visual_embeddings=visual_embeddings,
-            visual_embeddings_type=visual_embeddings_type,
-            attention_mask=attention_mask,
+        _, pooled_output, _ = self.bert.get_joint_embedding(
+            input_ids,
+            token_type_ids,
+            visual_embeddings,
+            visual_embeddings_type,
+            attention_mask,
         )
         logits = self.classifier(pooled_output)
         reshaped_logits = logits.contiguous().view(-1, self.num_labels)
@@ -144,55 +183,19 @@ class FashionViLForClassification(nn.Module):
 class FashionViLForContrastive(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
-        self.output_attentions = self.config.output_attentions
-        self.output_hidden_states = self.config.output_hidden_states
+        bert_model_name = getattr(config, "bert_model_name", "bert-base-uncased")
+        bert_config = BertConfig.from_dict(OmegaConf.to_container(config, resolve=True))
 
-        self.bert_model_name = getattr(
-            self.config, "bert_model_name", "bert-base-uncased"
-        )
-        self.bert_config = BertConfig.from_dict(
-            OmegaConf.to_container(self.config, resolve=True)
-        )
+        self.config = config
         self.bert = FashionViLBase.from_pretrained(
-            self.config.bert_model_name,
-            config=self.bert_config,
+            bert_model_name,
+            config=bert_config,
             cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
-            visual_embedding_dim=self.config.visual_embedding_dim,
-            output_attentions=self.config.output_attentions,
-            output_hidden_states=self.config.output_hidden_states,
+            visual_embedding_dim=config.visual_embedding_dim,
+            output_attentions=config.output_attentions,
+            output_hidden_states=config.output_hidden_states,
         )
         self.norm_layer = NormalizationLayer()
-
-    def get_image_embedding(
-        self,
-        visual_embeddings: Tensor,
-        visual_embeddings_type: Tensor,
-        attention_mask: Optional[Tensor] = None,
-    ) -> Tensor:
-        visual_embeddings, _, _ = self.bert(
-            visual_embeddings=visual_embeddings,
-            visual_embeddings_type=visual_embeddings_type,
-            attention_mask=attention_mask,
-        )
-        visual_embeddings = visual_embeddings.mean(dim=1)
-        visual_embeddings = self.norm_layer(visual_embeddings)
-        return visual_embeddings
-
-    def get_text_embedding(
-        self,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        attention_mask: Tensor,
-    ) -> Tensor:
-        text_embeddings, _, _ = self.bert(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask,
-        )
-        text_embeddings = text_embeddings[:, 0]
-        text_embeddings = self.norm_layer(text_embeddings)
-        return text_embeddings
 
     def forward(
         self,
@@ -203,14 +206,20 @@ class FashionViLForContrastive(nn.Module):
         text_attention_mask: Tensor,
         visual_attention_mask: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
-        visual_embeddings = self.get_image_embedding(
+        visual_embeddings, _, _ = self.bert.get_image_embedding(
             visual_embeddings, visual_embeddings_type, visual_attention_mask
         )
-        text_embeddings = self.get_text_embedding(
+        visual_embeddings = visual_embeddings.mean(dim=1)
+        visual_embeddings = self.norm_layer(visual_embeddings)
+
+        text_embeddings, _, _ = self.bert.get_text_embedding(
             input_ids,
             token_type_ids,
             text_attention_mask,
         )
+        text_embeddings = text_embeddings[:, 0]
+        text_embeddings = self.norm_layer(text_embeddings)
+
         output_dict = {
             "scores": visual_embeddings,
             "targets": text_embeddings,
@@ -221,64 +230,19 @@ class FashionViLForContrastive(nn.Module):
 class FashionViLForComposition(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
-        self.output_attentions = self.config.output_attentions
-        self.output_hidden_states = self.config.output_hidden_states
-        self.bypass_transformer = self.config.bypass_transformer
+        bert_model_name = getattr(config, "bert_model_name", "bert-base-uncased")
+        bert_config = BertConfig.from_dict(OmegaConf.to_container(config, resolve=True))
 
-        self.bert_model_name = getattr(
-            self.config, "bert_model_name", "bert-base-uncased"
-        )
-        self.bert_config = BertConfig.from_dict(
-            OmegaConf.to_container(self.config, resolve=True)
-        )
+        self.config = config
         self.bert = FashionViLBase.from_pretrained(
-            self.config.bert_model_name,
-            config=self.bert_config,
+            bert_model_name,
+            config=bert_config,
             cache_dir=os.path.join(get_mmf_cache_dir(), "distributed_{}".format(-1)),
-            visual_embedding_dim=self.config.visual_embedding_dim,
-            output_attentions=self.config.output_attentions,
-            output_hidden_states=self.config.output_hidden_states,
+            visual_embedding_dim=config.visual_embedding_dim,
+            output_attentions=config.output_attentions,
+            output_hidden_states=config.output_hidden_states,
         )
         self.norm_layer = NormalizationLayer()
-
-    def get_tar_image_embedding(
-        self,
-        visual_embeddings: Tensor,
-        visual_embeddings_type: Tensor,
-        attention_mask: Optional[Tensor] = None,
-    ) -> Tensor:
-        if self.bypass_transformer:
-            visual_embeddings = self.bert.embeddings.projection(visual_embeddings)
-        else:
-            visual_embeddings, _, _ = self.bert(
-                visual_embeddings=visual_embeddings,
-                visual_embeddings_type=visual_embeddings_type,
-                attention_mask=attention_mask,
-            )
-        visual_embeddings = visual_embeddings.mean(dim=1)
-        visual_embeddings = self.norm_layer(visual_embeddings)
-        return visual_embeddings
-
-    def get_comp_embedding(
-        self,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        visual_embeddings: Tensor,
-        visual_embeddings_type: Tensor,
-        attention_mask: Tensor,
-    ) -> Tensor:
-        comp_embeddings, _, _ = self.bert(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            visual_embeddings=visual_embeddings,
-            visual_embeddings_type=visual_embeddings_type,
-            attention_mask=attention_mask,
-        )
-        num_visual_tokens = visual_embeddings.shape[1]
-        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
-        comp_embeddings = self.norm_layer(comp_embeddings)
-        return comp_embeddings
 
     def forward(
         self,
@@ -291,16 +255,23 @@ class FashionViLForComposition(nn.Module):
         comp_attention_mask: Tensor,
         visual_attention_mask: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
-        tar_embeddings = self.get_tar_image_embedding(
+        tar_embeddings, _, _ = self.bert.get_image_embedding(
             tar_visual_embeddings, tar_visual_embeddings_type, visual_attention_mask
         )
-        comp_embeddings = self.get_comp_embedding(
+        tar_embeddings = tar_embeddings.mean(dim=1)
+        tar_embeddings = self.norm_layer(tar_embeddings)
+
+        comp_embeddings, _, _ = self.bert.get_joint_embedding(
             input_ids,
             token_type_ids,
             ref_visual_embeddings,
             ref_visual_embeddings_type,
             comp_attention_mask,
         )
+        num_visual_tokens = tar_visual_embeddings.shape[1]
+        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        comp_embeddings = self.norm_layer(comp_embeddings)
+
         output_dict = {
             "scores": comp_embeddings,
             "targets": tar_embeddings,
@@ -313,7 +284,7 @@ class FashionViL(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        self.training_head_type = self.config.training_head_type
+        self.training_head_type = config.training_head_type
 
     @classmethod
     def config_path(cls):
