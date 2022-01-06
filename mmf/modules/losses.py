@@ -782,16 +782,13 @@ class ContrastiveLoss(nn.Module):
     assumptions are made here.
     """
 
-    def __init__(self):
+    def __init__(self, temperature: Union[float, Tensor] = 1.0):
         super().__init__()
+        self.temperature = temperature
 
     def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
-        assert (
-            "embedding_1" in model_output and "embedding_2" in model_output
-        ), "Embedding names must be available before loss calculation"
-
-        embedding_1 = model_output["embedding_1"]
-        embedding_2 = model_output["embedding_2"]
+        embedding_1 = model_output["scores"]
+        embedding_2 = model_output["targets"]
 
         assert embedding_1.size(0) == embedding_2.size(0), "batch size must match"
         per_gpu_batch_size = embedding_1.size(0)
@@ -799,18 +796,16 @@ class ContrastiveLoss(nn.Module):
         embedding_1_all_gpus = gather_tensor_along_batch_with_backward(embedding_1)
         embedding_2_all_gpus = gather_tensor_along_batch_with_backward(embedding_2)
 
-        temperature = model_output["temperature"]
-
         logits_1 = (
             torch.matmul(embedding_1, embedding_2_all_gpus.transpose(0, 1))
-            / temperature
+            / self.temperature
         )
         logits_2 = (
             torch.matmul(embedding_2, embedding_1_all_gpus.transpose(0, 1))
-            / temperature
+            / self.temperature
         )
         labels = per_gpu_batch_size * get_rank() + torch.arange(
-            per_gpu_batch_size, device=temperature.device
+            per_gpu_batch_size, device=embedding_1.device
         )
 
         loss_1 = F.cross_entropy(logits_1, labels)
