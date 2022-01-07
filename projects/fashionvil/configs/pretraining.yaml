@@ -27,6 +27,7 @@ model_config:
   fashionvil:
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
+    task_for_inference: itc
     tasks:
       - itm
       - itc

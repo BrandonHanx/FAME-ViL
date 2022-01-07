@@ -14,6 +14,7 @@ from transformers.modeling_bert import BertOnlyNSPHead
 class FashionViLForPretraining(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
+        self.task_for_inference = config.task_for_inference
         self.tasks = config.tasks
         self.task_probs = config.task_probs
         self.heads = nn.ModuleDict()
@@ -35,7 +36,10 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["itc"] = ContrastiveLoss()
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        sample_list["task"] = random.choices(self.tasks, weights=self.task_probs)[0]
+        if self.training:
+            sample_list["task"] = random.choices(self.tasks, weights=self.task_probs)[0]
+        else:
+            sample_list["task"] = self.task_for_inference
         return sample_list
 
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
