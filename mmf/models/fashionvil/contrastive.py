@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 from mmf.models.composition import NormalizationLayer
@@ -12,35 +12,6 @@ class FashionViLForContrastive(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.norm_layer = NormalizationLayer()
-
-    def _forward(
-        self,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        visual_embeddings: Tensor,
-        visual_embeddings_type: Tensor,
-        text_attention_mask: Tensor,
-        visual_attention_mask: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
-            visual_embeddings, visual_embeddings_type, visual_attention_mask
-        )
-        visual_embeddings = visual_embeddings.mean(dim=1)
-        visual_embeddings = self.norm_layer(visual_embeddings)
-
-        text_embeddings, _, _ = self.bert.get_text_embedding(
-            input_ids,
-            token_type_ids,
-            text_attention_mask,
-        )
-        text_embeddings = text_embeddings[:, 0]
-        text_embeddings = self.norm_layer(text_embeddings)
-
-        output_dict = {
-            "scores": visual_embeddings,
-            "targets": text_embeddings,
-        }
-        return output_dict
 
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
@@ -58,16 +29,24 @@ class FashionViLForContrastive(FashionViLBaseModel):
         ).long()
         return sample_list
 
-    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        sample_list = self.flatten_for_bert(sample_list)
-        sample_list = self.add_post_flatten_params(sample_list)
-
-        output_dict = self._forward(
-            input_ids=sample_list["input_ids"],
-            token_type_ids=sample_list["segment_ids"],
-            visual_embeddings=sample_list["image"],
-            visual_embeddings_type=sample_list["visual_embeddings_type"],
-            text_attention_mask=sample_list["input_mask"],
+    def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        visual_embeddings, _, _ = self.bert.get_image_embedding(
+            sample_list["image"],
+            sample_list["visual_embeddings_type"],
         )
+        visual_embeddings = visual_embeddings.mean(dim=1)
+        visual_embeddings = self.norm_layer(visual_embeddings)
 
+        text_embeddings, _, _ = self.bert.get_text_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["input_mask"],
+        )
+        text_embeddings = text_embeddings[:, 0]
+        text_embeddings = self.norm_layer(text_embeddings)
+
+        output_dict = {
+            "scores": visual_embeddings,
+            "targets": text_embeddings,
+        }
         return output_dict

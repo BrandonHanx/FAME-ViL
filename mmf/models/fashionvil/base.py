@@ -157,13 +157,22 @@ class FashionViLBaseModel(nn.Module):
             sample_list[key] = transform_to_batch_sequence_dim(sample_list[key])
         return sample_list
 
+    def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        return sample_list
+
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        raise NotImplementedError
+        return sample_list
 
     def add_post_flatten_params(
         self, sample_list: Dict[str, Tensor]
     ) -> Dict[str, Tensor]:
-        raise NotImplementedError
+        return sample_list
 
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         raise NotImplementedError
+
+    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        sample_list = self.add_custom_params(sample_list)
+        sample_list = self.flatten_for_bert(sample_list)
+        sample_list = self.add_post_flatten_params(sample_list)
+        return self._forward(sample_list)

@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 from mmf.models.composition import NormalizationLayer
@@ -12,40 +12,6 @@ class FashionViLForComposition(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.norm_layer = NormalizationLayer()
-
-    def _forward(
-        self,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        tar_visual_embeddings: Tensor,
-        tar_visual_embeddings_type: Tensor,
-        ref_visual_embeddings: Tensor,
-        ref_visual_embeddings_type: Tensor,
-        comp_attention_mask: Tensor,
-        visual_attention_mask: Optional[Tensor] = None,
-    ) -> Dict[str, Tensor]:
-        tar_embeddings, _, _ = self.bert.get_image_embedding(
-            tar_visual_embeddings, tar_visual_embeddings_type, visual_attention_mask
-        )
-        tar_embeddings = tar_embeddings.mean(dim=1)
-        tar_embeddings = self.norm_layer(tar_embeddings)
-
-        comp_embeddings, _, _ = self.bert.get_joint_embedding(
-            input_ids,
-            token_type_ids,
-            ref_visual_embeddings,
-            ref_visual_embeddings_type,
-            comp_attention_mask,
-        )
-        num_visual_tokens = tar_visual_embeddings.shape[1]
-        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
-        comp_embeddings = self.norm_layer(comp_embeddings)
-
-        output_dict = {
-            "scores": comp_embeddings,
-            "targets": tar_embeddings,
-        }
-        return output_dict
 
     def add_post_flatten_params(
         self, sample_list: Dict[str, Tensor]
@@ -72,18 +38,28 @@ class FashionViLForComposition(FashionViLBaseModel):
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
-    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        sample_list = self.flatten_for_bert(sample_list)
-        sample_list = self.add_post_flatten_params(sample_list)
-
-        output_dict = self._forward(
-            input_ids=sample_list["input_ids"],
-            token_type_ids=sample_list["segment_ids"],
-            tar_visual_embeddings=sample_list["tar_image"],
-            tar_visual_embeddings_type=sample_list["tar_visual_embeddings_type"],
-            ref_visual_embeddings=sample_list["ref_image"],
-            ref_visual_embeddings_type=sample_list["ref_visual_embeddings_type"],
-            comp_attention_mask=sample_list["comp_attention_mask"],
-            visual_attention_mask=sample_list["visual_attention_mask"],
+    def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        tar_embeddings, _, _ = self.bert.get_image_embedding(
+            sample_list["tar_image"],
+            sample_list["tar_visual_embeddings_type"],
+            sample_list["visual_attention_mask"],
         )
+        tar_embeddings = tar_embeddings.mean(dim=1)
+        tar_embeddings = self.norm_layer(tar_embeddings)
+
+        comp_embeddings, _, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["ref_image"],
+            sample_list["ref_visual_embeddings_type"],
+            sample_list["comp_attention_mask"],
+        )
+        num_visual_tokens = sample_list["tar_image"].shape[1]
+        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        comp_embeddings = self.norm_layer(comp_embeddings)
+
+        output_dict = {
+            "scores": comp_embeddings,
+            "targets": tar_embeddings,
+        }
         return output_dict

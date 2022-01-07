@@ -30,7 +30,9 @@ model_config:
     tasks:
       - itm
       - itc
-
+    task_probs:
+      - 0.5
+      - 0.5
 
 scheduler:
   type: multi_step
@@ -55,7 +57,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain
+  experiment_name: fashionvil_pretrain_0.5
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

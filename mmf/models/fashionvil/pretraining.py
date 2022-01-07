@@ -1,5 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
+import random
 from typing import Dict
 
 import torch
@@ -14,6 +15,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.tasks = config.tasks
+        self.task_probs = config.task_probs
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
 
@@ -32,6 +34,10 @@ class FashionViLForPretraining(FashionViLBaseModel):
         if "itc" in self.tasks:
             self.loss_funcs["itc"] = ContrastiveLoss()
 
+    def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        sample_list["task"] = random.choices(self.tasks, weights=self.task_probs)[0]
+        return sample_list
+
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
         to_be_flattened_dim = ["image"]
@@ -39,16 +45,14 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return flattened
 
     def add_post_flatten_params(
-        self,
-        sample_list: Dict[str, Tensor],
-        task: str,
+        self, sample_list: Dict[str, Tensor]
     ) -> Dict[str, Tensor]:
         b, l, _ = sample_list["image"].shape
         device = sample_list["image"].device
         sample_list["visual_embeddings_type"] = torch.zeros(
             (b, l), device=device
         ).long()
-        if task == "itm":
+        if sample_list["task"] == "itm":
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -58,7 +62,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
             )
         return sample_list
 
-    def forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         input_ids = sample_list["input_ids"]
         token_type_ids = sample_list["segment_ids"]
         visual_embeddings = sample_list["image"]
@@ -90,7 +94,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
-    def forward_itm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def _forward_itm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         input_ids = sample_list["input_ids"]
         token_type_ids = sample_list["segment_ids"]
         visual_embeddings = sample_list["image"]
@@ -101,7 +105,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         # FIXME: not support multi-gpu
         self.eval()
         with torch.no_grad():
-            itc_dict = self.forward_itc(sample_list)
+            itc_dict = self._forward_itc(sample_list)
             image_embeddings = itc_dict["scores"]
             text_embeddings = itc_dict["targets"]
             correlations = image_embeddings @ text_embeddings.t()
@@ -137,16 +141,10 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
-    def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        if torch.rand(1) > 0.3 and self.training:
-            task = "itm"
+    def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if sample_list["task"] == "itm":
+            ouput_dict = self._forward_itm(sample_list)
         else:
-            task = "itc"
-        sample_list = self.flatten_for_bert(sample_list)
-        sample_list = self.add_post_flatten_params(sample_list, task)
-        if task == "itm":
-            ouput_dict = self.forward_itm(sample_list)
-        else:
-            ouput_dict = self.forward_itc(sample_list)
+            ouput_dict = self._forward_itc(sample_list)
 
         return ouput_dict

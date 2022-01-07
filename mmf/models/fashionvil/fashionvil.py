@@ -8,7 +8,6 @@ from mmf.models.fashionvil.classification import FashionViLForClassification
 from mmf.models.fashionvil.composition import FashionViLForComposition
 from mmf.models.fashionvil.contrastive import FashionViLForContrastive
 from mmf.models.fashionvil.pretraining import FashionViLForPretraining
-from mmf.utils.modeling import get_optimizer_parameters_for_bert
 from torch import Tensor
 
 
@@ -41,9 +40,6 @@ class FashionViL(BaseModel):
         if getattr(self.config, "freeze_base", False):
             for p in self.model.bert.parameters():
                 p.requires_grad = False
-
-    def get_optimizer_parameters(self, config):
-        return get_optimizer_parameters_for_bert(self.model, config)
 
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         return self.model(sample_list)
