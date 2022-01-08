@@ -69,15 +69,12 @@ class FACADDataset(MMFDataset):
             sentence = sample_info[text_attr]
         current_sample.text = sentence
 
-        if hasattr(self, "masked_token_processor"):
-            processed_sentence = self.masked_token_processor({"text_a": sentence})
-            processed_sentence.pop("tokens")
-            processed_sentence.pop("is_correct")
+        if hasattr(self, "masked_token_processor") and self._dataset_type == "train":
+            processed_sentence = self.masked_token_processor({"text": sentence})
             current_sample.update(processed_sentence)
         else:
             processed_sentence = self.text_processor({"text": sentence})
-            if "input_ids" in processed_sentence:
-                current_sample.update(processed_sentence)
+            current_sample.update(processed_sentence)
 
         if self._use_images:
             current_sample.image = self.image_db[idx]["images"][0]

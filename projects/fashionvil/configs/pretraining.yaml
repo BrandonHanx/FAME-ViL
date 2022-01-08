@@ -26,7 +26,7 @@ dataset_config:
         # masked_image_processor:
         #   type: blockwise_masked_patch
         masked_token_processor:
-          type: masked_token
+          type: uniter_text_tokenizer
           params:
             tokenizer_config:
               type: bert-base-uncased

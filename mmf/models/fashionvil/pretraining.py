@@ -63,7 +63,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         to_be_flattened = ["input_ids", "segment_ids"]
         to_be_flattened_dim = ["image"]
         if sample_list["task"] == "mlm":
-            to_be_flattened.append("lm_label_ids")
+            to_be_flattened += ["lm_label_ids", "input_ids_masked"]
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
@@ -160,7 +160,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def _forward_mlm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         sequence_output, _, _ = self.bert.get_joint_embedding(
-            sample_list["input_ids"],
+            sample_list["input_ids_masked"],
             sample_list["segment_ids"],
             sample_list["image"],
             sample_list["visual_embeddings_type"],
