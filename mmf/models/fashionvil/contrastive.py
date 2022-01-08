@@ -42,7 +42,12 @@ class FashionViLForContrastive(FashionViLBaseModel):
             sample_list["segment_ids"],
             sample_list["input_mask"],
         )
-        text_embeddings = text_embeddings[:, 0]
+        # text_embeddings = text_embeddings[:, 0]
+        masks = sample_list["input_mask"]
+        text_embeddings = text_embeddings * masks.unsqueeze(2)
+        text_embeddings = torch.sum(text_embeddings, dim=1) / (
+            torch.sum(masks, dim=1, keepdim=True)
+        )
         text_embeddings = self.norm_layer(text_embeddings)
 
         output_dict = {
