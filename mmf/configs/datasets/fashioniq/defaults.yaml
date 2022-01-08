@@ -34,7 +34,7 @@ dataset_config:
               params:
                 do_lower_case: true
             mask_probability: 0
-            max_seq_length: 20
+            max_seq_length: 50
         train_image_processor:
           type: torchvision_transforms
           params:

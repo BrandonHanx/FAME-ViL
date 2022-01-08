@@ -22,6 +22,18 @@ dataset_config:
         - FACAD/test_info.json
         test:
         - FACAD/test_info.json
+    processors:
+        # masked_image_processor:
+        #   type: blockwise_masked_patch
+        masked_token_processor:
+          type: masked_token
+          params:
+            tokenizer_config:
+              type: bert-base-uncased
+              params:
+                do_lower_case: true
+            mask_probability: 0.15
+            max_seq_length: 50
 
 model_config:
   fashionvil:
@@ -31,9 +43,11 @@ model_config:
     tasks:
       - itm
       - itc
+      - mlm
     task_probs:
-      - 0.5
-      - 0.5
+      - 0.4
+      - 0.3
+      - 0.3
 
 scheduler:
   type: multi_step
@@ -58,7 +72,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_0.5
+  experiment_name: fashionvil_pretrain_itc_itm_mlm
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

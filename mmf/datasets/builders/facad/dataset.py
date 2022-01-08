@@ -67,15 +67,24 @@ class FACADDataset(MMFDataset):
             is_correct = 0
         else:
             sentence = sample_info[text_attr]
-        processed_sentence = self.text_processor({"text": sentence})
+        current_sample.text = sentence
 
-        current_sample.text = processed_sentence["text"]
-        if "input_ids" in processed_sentence:
+        if hasattr(self, "masked_token_processor"):
+            processed_sentence = self.masked_token_processor({"text_a": sentence})
+            processed_sentence.pop("tokens")
+            processed_sentence.pop("is_correct")
             current_sample.update(processed_sentence)
+        else:
+            processed_sentence = self.text_processor({"text": sentence})
+            if "input_ids" in processed_sentence:
+                current_sample.update(processed_sentence)
+
         if self._use_images:
             current_sample.image = self.image_db[idx]["images"][0]
         else:
             current_sample.image = self.features_db[idx]["image_feature_0"]
+            if hasattr(self, "masked_image_processor"):
+                current_sample.image_masks = self.masked_image_processor(current_sample.image)
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = torch.tensor(is_correct, dtype=torch.long)
 

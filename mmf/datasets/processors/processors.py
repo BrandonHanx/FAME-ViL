@@ -1691,9 +1691,6 @@ class BlockWiseMaskedPatchProcessor(BaseProcessor):
         max_aspect = config.get("max_aspect", 1 / min_aspect)
         self.log_aspect_ratio = (math.log(min_aspect), math.log(max_aspect))
 
-    def get_shape(self):
-        return self.height, self.width
-
     def _mask(self, mask, max_mask_patches):
         delta = 0
         for attempt in range(10):
@@ -1720,7 +1717,7 @@ class BlockWiseMaskedPatchProcessor(BaseProcessor):
 
     def __call__(self, x):
         assert self.height * self.width == x.shape[0]
-        mask = torch.zeros(shape=self.get_shape(), dtype=torch.long, device=x.device)
+        mask = torch.zeros((self.height, self.width), dtype=torch.long)
         mask_count = 0
         while mask_count < self.num_masking_patches:
             max_mask_patches = self.num_masking_patches - mask_count

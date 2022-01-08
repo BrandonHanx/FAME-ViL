@@ -1,14 +1,17 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
+import os
 import random
+from copy import deepcopy
 from typing import Dict
 
 import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss
+from mmf.utils.configuration import get_mmf_cache_dir
 from torch import Tensor, nn
-from transformers.modeling_bert import BertOnlyNSPHead
+from transformers.modeling_bert import BertOnlyNSPHead, BertForPreTraining
 
 
 class FashionViLForPretraining(FashionViLBaseModel):
@@ -28,12 +31,26 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.heads["itm"] = BertOnlyNSPHead(self.bert.config)
         if "itc" in self.tasks:
             self.heads["itc"] = NormalizationLayer()
+        if "mlm" in self.tasks:
+            bert_masked_lm = BertForPreTraining.from_pretrained(
+                self.config.bert_model_name,
+                config=self.bert.config,
+                cache_dir=os.path.join(
+                    get_mmf_cache_dir(), "distributed_{}".format(-1)
+                ),
+            )
+            self.heads["mlm"] = deepcopy(bert_masked_lm.cls.predictions)
+            self.bert._tie_or_clone_weights(
+                self.heads["mlm"].decoder, self.bert.embeddings.word_embeddings
+            )
 
     def init_losses(self):
         if "itm" in self.tasks:
             self.loss_funcs["itm"] = CrossEntropyLoss()
         if "itc" in self.tasks:
             self.loss_funcs["itc"] = ContrastiveLoss()
+        if "mlm" in self.tasks:
+            self.loss_funcs["mlm"] = CrossEntropyLoss(ignore_index=-1)
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
@@ -45,6 +62,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
         to_be_flattened_dim = ["image"]
+        if sample_list["task"] == "mlm":
+            to_be_flattened.append("lm_label_ids")
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
@@ -56,7 +75,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         sample_list["visual_embeddings_type"] = torch.zeros(
             (b, l), device=device
         ).long()
-        if sample_list["task"] == "itm":
+        if sample_list["task"] in ["itm", "mlm"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -67,22 +86,16 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return sample_list
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        input_ids = sample_list["input_ids"]
-        token_type_ids = sample_list["segment_ids"]
-        visual_embeddings = sample_list["image"]
-        visual_embeddings_type = sample_list["visual_embeddings_type"]
-        text_attention_mask = sample_list["input_mask"]
-
         visual_embeddings, _, _ = self.bert.get_image_embedding(
-            visual_embeddings, visual_embeddings_type
+            sample_list["image"], sample_list["visual_embeddings_type"]
         )
         visual_embeddings = visual_embeddings.mean(dim=1)
         visual_embeddings = self.heads["itc"](visual_embeddings)
 
         text_embeddings, _, _ = self.bert.get_text_embedding(
-            input_ids,
-            token_type_ids,
-            text_attention_mask,
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["input_mask"],
         )
         text_embeddings = text_embeddings[:, 0]
         text_embeddings = self.heads["itc"](text_embeddings)
@@ -145,9 +158,37 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_mlm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        sequence_output, _, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
+        )
+        num_visual_tokens = sample_list["image"].shape[1]
+        sequence_output = sequence_output[:, :-num_visual_tokens]
+        logits = (
+            self.heads["mlm"](sequence_output)
+            .contiguous()
+            .view(-1, self.bert.config.vocab_size)
+        )
+        labels = sample_list["lm_label_ids"].contiguous().view(-1)
+        sample_list["targets"] = labels
+
+        output_dict = {"scores": logits}
+
+        loss = {}
+        loss["mlm_loss"] = self.loss_funcs["mlm"](sample_list, output_dict)
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
+        elif sample_list["task"] == "mlm":
+            ouput_dict = self._forward_mlm(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 
