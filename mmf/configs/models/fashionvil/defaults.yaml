@@ -1,5 +1,7 @@
 model_config:
   fashionvil:
+    image_encoder: identity
+    direct_features_input: true
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     visual_embedding_dim: 2048

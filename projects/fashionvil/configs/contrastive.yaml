@@ -55,7 +55,7 @@ evaluation:
     - r@10_rev_retrieval
 
 training:
-  experiment_name: fashionvil_itc_facad_avgpool
+  experiment_name: fashionvil_itc_facad
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

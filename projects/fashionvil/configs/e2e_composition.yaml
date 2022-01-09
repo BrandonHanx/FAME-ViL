@@ -5,11 +5,20 @@ includes:
 
 dataset_config:
   fashioniq:
-    use_images: false
-    use_features: true
+    use_images: true
+    use_features: false
 
 model_config:
   fashionvil:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+    direct_features_input: false
     bert_model_name: bert-base-uncased
     training_head_type: composition
     bypass_transformer: false
@@ -39,7 +48,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq
+  experiment_name: fashionvil_composition_fashioniq_e2e
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960
@@ -54,8 +63,8 @@ training:
 
 run_type: train_val
 
-checkpoint:
-  resume_pretrained: true
-  resume_file: save/fashionvil_pretrain_itc_itm/best.ckpt
-  pretrained_state_mapping:
-    model.bert: model.bert
+# checkpoint:
+#   resume_pretrained: true
+#   resume_file: save/fashionvil_pretrain_itc_itm/best.ckpt
+#   pretrained_state_mapping:
+#     model.bert: model.bert

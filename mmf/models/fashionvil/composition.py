@@ -5,15 +5,12 @@ from typing import Dict
 import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
-from mmf.modules.layers import AttnPool1d
 from torch import Tensor
 
 
 class FashionViLForComposition(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
-        self.image_pool = AttnPool1d(self.bert.config.hidden_size, 1)
-        self.joint_pool = AttnPool1d(self.bert.config.hidden_size, 1)
         self.norm_layer = NormalizationLayer()
 
     def add_post_flatten_params(
@@ -47,8 +44,7 @@ class FashionViLForComposition(FashionViLBaseModel):
             sample_list["tar_visual_embeddings_type"],
             sample_list["visual_attention_mask"],
         )
-        # tar_embeddings = tar_embeddings.mean(dim=1)
-        tar_embeddings = self.image_pool(tar_embeddings, tar_embeddings).squeeze(1)
+        tar_embeddings = tar_embeddings.mean(dim=1)
         tar_embeddings = self.norm_layer(tar_embeddings)
 
         comp_embeddings, _, _ = self.bert.get_joint_embedding(
@@ -58,11 +54,8 @@ class FashionViLForComposition(FashionViLBaseModel):
             sample_list["ref_visual_embeddings_type"],
             sample_list["comp_attention_mask"],
         )
-        # num_visual_tokens = sample_list["tar_image"].shape[1]
-        # comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
-        comp_embeddings = self.joint_pool(
-            comp_embeddings, comp_embeddings, sample_list["comp_attention_mask"].eq(0)
-        ).squeeze(1)
+        num_visual_tokens = sample_list["tar_image"].shape[1]
+        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
         comp_embeddings = self.norm_layer(comp_embeddings)
 
         output_dict = {
