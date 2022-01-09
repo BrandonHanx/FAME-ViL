@@ -107,7 +107,7 @@ class FashionViLBase(BertPreTrainedModel):
         attention_mask: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor, List[Tensor]]:
         if self.bypass_transformer:
-            return self.embeddings.projection(visual_embeddings)
+            return self.embeddings.projection(visual_embeddings), None, None
         else:
             return self.forward(
                 visual_embeddings=visual_embeddings,
