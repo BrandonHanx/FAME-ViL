@@ -93,8 +93,8 @@ class ImageFeatureEncoderFactory(EncoderFactory):
 
         if encoder_type == "default" or encoder_type == "identity":
             self.module = Identity()
-            # self.module.in_dim = params.in_dim
-            # self.module.out_dim = params.in_dim
+            self.module.in_dim = params.in_dim
+            self.module.out_dim = params.in_dim
         elif encoder_type == "projection":
             if "module" not in params:
                 params = deepcopy(params)
