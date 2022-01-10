@@ -21,7 +21,7 @@ model_config:
     direct_features_input: false
     bert_model_name: bert-base-uncased
     training_head_type: composition
-    bypass_transformer: false
+    bypass_transformer: true
     losses:
       - type: bbc_loss
 
@@ -39,7 +39,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 5e-5
+    lr: 1e-5
     eps: 1e-8
     weight_decay: 1e-4
 
@@ -48,7 +48,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq_e2e
+  experiment_name: fashionvil_composition_fashioniq_e2e_bypass_lr
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960

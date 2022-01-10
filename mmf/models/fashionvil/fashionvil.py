@@ -51,7 +51,7 @@ class FashionViL(BaseModel):
         image_encoder_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * 10,
+                "lr": base_lr * 20,
             }
         ]
         rest_params = [
