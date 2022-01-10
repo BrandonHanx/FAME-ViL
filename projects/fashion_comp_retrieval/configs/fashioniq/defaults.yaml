@@ -25,7 +25,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: simple_composition_fashioniq_small_bert
+  experiment_name: simple_composition_fashioniq_avgpool
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960

@@ -15,8 +15,4 @@ model_config:
     bypass_transformer: false
     random_initialize: false
     freeze_base: false
-    finetune_lr_multiplier: 1
-    # Default points to BERT pooler strategy which is to take
-    # representation of CLS token after passing it through a dense layer
-    pooler_strategy: default
-    zerobias: false     # Initialize last layer to predict closer to 0 on init for sigmoid outputs
+    image_encoder_lr_multiplier: 1

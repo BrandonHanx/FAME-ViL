@@ -178,8 +178,8 @@ class SimpleComposition(BaseComposition):
         # Image embedding
         image_proj = self.image_proj(src)
         # image_proj shape B x 49 x 512
-        image_pool = self.image_pool(image_proj, image_proj).squeeze(1)
-
+        # image_pool = self.image_pool(image_proj, image_proj).squeeze(1)
+        image_pool = image_proj.mean(dim=1)
         return image_pool
 
     def get_ref_image_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -195,7 +195,12 @@ class SimpleComposition(BaseComposition):
 
         # Text embedding
         text_proj = self.text_proj(text_enc[0])
-        text_pool = self.text_pool(text_proj, text_proj, mask.eq(0)).squeeze(1)
+        # text_pool = self.text_pool(text_proj, text_proj, mask.eq(0)).squeeze(1)
+        masks = sample_list["input_mask"]
+        text_proj = text_proj * masks.unsqueeze(2)
+        text_pool = torch.sum(text_proj, dim=1) / (
+            torch.sum(masks, dim=1, keepdim=True)
+        )
 
         return text_pool
 

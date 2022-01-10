@@ -10,6 +10,7 @@ from mmf.models.fashionvil.contrastive import FashionViLForContrastive
 from mmf.models.fashionvil.pretraining import FashionViLForPretraining
 from mmf.utils.build import build_image_encoder
 from mmf.utils.general import filter_grads
+from mmf.utils.modeling import get_fashionvil_configured_parameters
 from torch import Tensor
 
 
@@ -48,18 +49,26 @@ class FashionViL(BaseModel):
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
+        weight_decay = config.optimizer.params.weight_decay
+
         image_encoder_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * 20,
+                "lr": base_lr * self.config.image_encoder_lr_multiplier,
             }
         ]
-        rest_params = [
-            {"params": filter_grads(self.model.parameters()), "lr": base_lr},
-        ]
-        training_parameters = image_encoder_params + rest_params
-
-        return training_parameters
+        lr_filter = []
+        if self.training_head_type == "composition" and self.config.bypass_transformer:
+            lr_filter.append("bert.embeddings.projection.weight")
+            lr_filter.append("bert.embeddings.projection.bias")
+        bert_params = get_fashionvil_configured_parameters(
+            self.model,
+            base_lr,
+            weight_decay,
+            lr_filter,
+            self.config.image_encoder_lr_multiplier,
+        )
+        return image_encoder_params + bert_params
 
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training_head_type == "composition":
