@@ -50,15 +50,16 @@ class FashionViL(BaseModel):
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
         weight_decay = config.optimizer.params.weight_decay
+        lr_multiplier = self.config.lr_multiplier
 
         image_encoder_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * self.config.image_encoder_lr_multiplier,
+                "lr": base_lr * lr_multiplier,
             }
         ]
         lr_filter = []
-        if self.training_head_type == "composition" and self.config.bypass_transformer:
+        if self.training_head_type == "composition":
             lr_filter.append("bert.embeddings.projection.weight")
             lr_filter.append("bert.embeddings.projection.bias")
         bert_params = get_fashionvil_configured_parameters(
@@ -66,7 +67,7 @@ class FashionViL(BaseModel):
             base_lr,
             weight_decay,
             lr_filter,
-            self.config.image_encoder_lr_multiplier,
+            lr_multiplier,
         )
         return image_encoder_params + bert_params
 

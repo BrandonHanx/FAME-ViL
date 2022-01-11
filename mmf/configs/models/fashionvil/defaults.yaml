@@ -15,4 +15,4 @@ model_config:
     bypass_transformer: false
     random_initialize: false
     freeze_base: false
-    image_encoder_lr_multiplier: 1
+    lr_multiplier: 1
