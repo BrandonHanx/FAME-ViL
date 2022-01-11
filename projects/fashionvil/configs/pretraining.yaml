@@ -26,7 +26,7 @@ dataset_config:
         # masked_image_processor:
         #   type: blockwise_masked_patch
         masked_token_processor:
-          type: uniter_text_tokenizer
+          type: fashionvil_text_tokenizer
           params:
             tokenizer_config:
               type: bert-base-uncased
@@ -34,12 +34,14 @@ dataset_config:
                 do_lower_case: true
             mask_probability: 0.15
             max_seq_length: 50
+            do_whole_word_mask: true
 
 model_config:
   fashionvil:
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     task_for_inference: itc
+    lr_multiplier: 10
     tasks:
       - itm
       - itc
@@ -72,7 +74,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_itc_itm_mlm
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_improved
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

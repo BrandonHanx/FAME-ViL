@@ -512,6 +512,138 @@ class UNITERTextTokenizer(MaskedTokenProcessor):
         }
 
 
+@registry.register_processor("fashionvil_text_tokenizer")
+class FashionViLTextTokenizer(MaskedTokenProcessor):
+    def __init__(self, config, *args, **kwargs):
+        from transformers import BertTokenizer
+
+        if isinstance(config, str):
+            config = {"from_pretrained": config}
+
+        from_pretrained_name = config.get("from_pretrained", "bert-base-uncased")
+        kwargs_dict = dict(kwargs, do_lower_case="uncased" in from_pretrained_name)
+        self._tokenizer = BertTokenizer.from_pretrained(
+            from_pretrained_name, **kwargs_dict
+        )
+        self._max_seq_length = config.get("max_seq_length", 25)
+        self._probability = config.get("mask_probability", 0)
+        self._do_whole_word_mask = config.get("do_whole_word_mask", False)
+
+    def __call__(self, item: Dict[str, Any]):
+        output = get_pair_text_tokens(item, self)
+        if "is_correct" in item:
+            output["is_correct"] = torch.tensor(
+                item.get("is_correct", True), dtype=torch.long
+            )
+        return output
+
+    def _token_transform(
+        self, tokens: List[str], tokens_b: Optional[List[str]] = None
+    ) -> Tuple[torch.Tensor, int, int, List[str]]:
+        tokens = [self._CLS_TOKEN] + tokens + [self._SEP_TOKEN]
+        if tokens_b:
+            tokens += tokens_b + [self._SEP_TOKEN]
+
+        input_ids = self._convert_tokens_to_ids(tokens)
+        token_len = len(input_ids)
+        token_pad = self._max_seq_length - token_len
+        # Zero-pad up to the sequence length.
+        input_ids += [self._PAD_TOKEN_ID] * token_pad
+        input_ids_tensor = torch.tensor(input_ids, dtype=torch.long)
+        return input_ids_tensor, token_len, token_pad, tokens
+
+    def _random_whole_word(
+        self, tokens: List[str], probability: float = 0.15
+    ) -> Tuple[List[str], List[int]]:
+        cand_indexes = []
+        for (i, token) in enumerate(tokens):
+            if len(cand_indexes) >= 1 and token.startswith("##"):
+                cand_indexes[-1].append(i)
+            else:
+                cand_indexes.append([i])
+
+        labels = []
+        for idx in cand_indexes:
+            prob = random.random()
+
+            if prob < probability:
+                prob /= probability
+
+                # rest 10% keep the original token as it is
+                for i in idx:
+                    labels.append(self._convert_tokens_to_ids(tokens[i]))
+                # 80% randomly change token to mask token
+                if prob < 0.8:
+                    for i in idx:
+                        tokens[i] = self._MASK_TOKEN
+                # 10% randomly change token to random token
+                elif prob < 0.9:
+                    for i in idx:
+                        tokens[i] = self._convert_ids_to_tokens(
+                            torch.randint(self.get_vocab_size(), (1,), dtype=torch.long)
+                        )[0]
+            else:
+                labels += [-1] * len(idx)
+
+        return tokens, labels
+
+    def _convert_to_indices(
+        self,
+        tokens_a: List[str],
+        tokens_b: Optional[List[str]] = None,
+        probability: float = 0.15,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        BERT encodes
+        - single sequence: ``[CLS] X [SEP]``
+        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
+        """
+        input_ids_original, _, _, tokens = self._token_transform(tokens_a, tokens_b)
+
+        if self._do_whole_word_mask:
+            tokens_a, label_a = self._random_whole_word(
+                tokens_a, probability=probability
+            )
+        else:
+            tokens_a, label_a = self._random_word(tokens_a, probability=probability)
+        segment_ids = [0] * (len(tokens_a) + 2)
+
+        if tokens_b:
+            if self._do_whole_word_mask:
+                tokens_b, label_b = self._random_whole_word(
+                    tokens_b, probability=probability
+                )
+            else:
+                tokens_b, label_b = self._random_word(tokens_b, probability=probability)
+            lm_label_ids = [-1] + label_a + [-1] + label_b + [-1]
+            assert len(tokens_b) > 0
+            segment_ids += [1] * (len(tokens_b) + 1)
+        else:
+            lm_label_ids = [-1] + label_a + [-1]
+
+        input_ids_masked, token_len, token_pad, tokens_masked = self._token_transform(
+            tokens_a, tokens_b
+        )
+
+        input_mask = [1] * token_len + [0] * token_pad
+        segment_ids += [0] * token_pad
+        lm_label_ids += [-1] * token_pad
+
+        input_mask = torch.tensor(input_mask, dtype=torch.long)
+        segment_ids = torch.tensor(segment_ids, dtype=torch.long)
+        lm_label_ids = torch.tensor(lm_label_ids, dtype=torch.long)
+        return {
+            "input_ids_masked": input_ids_masked,  # specifically for MLM heads
+            "input_ids": input_ids_original,  # unmasked tokens for CLIP heads
+            # input_mask is non-padding (1) vs padding (0) mask (not MLM token masking)
+            "input_mask": input_mask,
+            "segment_ids": segment_ids,
+            "lm_label_ids": lm_label_ids,
+            "tokens_masked": tokens_masked,
+            "tokens": tokens,
+        }
+
+
 @registry.register_processor("vinvl_text_tokenizer")
 class VinVLTextTokenizer(MaskedTokenProcessor):
     def __init__(self, config, *args, **kwargs):
