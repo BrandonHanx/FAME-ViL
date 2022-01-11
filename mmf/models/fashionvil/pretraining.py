@@ -8,10 +8,14 @@ from typing import Dict
 import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
-from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss
+from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss, MSELoss
 from mmf.utils.configuration import get_mmf_cache_dir
 from torch import Tensor, nn
-from transformers.modeling_bert import BertOnlyNSPHead, BertForPreTraining
+from transformers.modeling_bert import (
+    BertOnlyNSPHead,
+    BertForPreTraining,
+    BertPredictionHeadTransform,
+)
 
 
 class FashionViLForPretraining(FashionViLBaseModel):
@@ -43,6 +47,24 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.bert._tie_or_clone_weights(
                 self.heads["mlm"].decoder, self.bert.embeddings.word_embeddings
             )
+        if "mpfr" in self.tasks:
+            self.heads["mpfr"] = nn.Sequential(
+                BertPredictionHeadTransform(self.bert.config),
+                nn.Linear(
+                    self.bert.config.hidden_size,
+                    self.config.visual_embedding_dim,
+                    bias=False,
+                ),
+            )
+            self.bert._tie_or_clone_weights(
+                self.heads["mpfr"][1], self.bert.embeddings.projection
+            )
+            self.heads["mpfr"][1].weight = nn.Parameter(
+                self.heads["mpfr"][1].weight.t()
+            )
+            self.heads["mpfr"][1].bias = nn.Parameter(
+                torch.zeros(self.config.visual_embedding_dim)
+            )
 
     def init_losses(self):
         if "itm" in self.tasks:
@@ -51,6 +73,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["itc"] = ContrastiveLoss()
         if "mlm" in self.tasks:
             self.loss_funcs["mlm"] = CrossEntropyLoss(ignore_index=-1)
+        if "mpfr" in self.tasks:
+            self.loss_funcs["mpfr"] = MSELoss()
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
@@ -64,6 +88,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
         to_be_flattened_dim = ["image"]
         if sample_list["task"] == "mlm":
             to_be_flattened += ["lm_label_ids", "input_ids_masked"]
+        elif sample_list["task"] == "mpfr":
+            to_be_flattened += ["image_masks"]
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
@@ -75,7 +101,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         sample_list["visual_embeddings_type"] = torch.zeros(
             (b, l), device=device
         ).long()
-        if sample_list["task"] in ["itm", "mlm"]:
+        if sample_list["task"] in ["itm", "mlm", "mpfr"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -188,11 +214,45 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_mpfr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        hidden, _, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
+        )
+        _, num_visual_tokens, visual_dim = sample_list["image"].shape
+
+        mask = sample_list["image_masks"] == 1
+        mask = mask.unsqueeze(-1)
+
+        hidden = hidden[:, -num_visual_tokens:]
+        hidden_masked = (
+            hidden[mask.expand_as(hidden)].contiguous().view(-1, hidden.size(-1))
+        )
+        predict_feat = self.heads["mpfr"](hidden_masked)
+
+        target = sample_list["image"]
+        target_masked = target[mask.expand_as(target)].contiguous().view(-1, visual_dim)
+
+        sample_list["targets"] = target_masked
+
+        output_dict = {"scores": predict_feat}
+
+        loss = {}
+        loss["mpfr_loss"] = self.loss_funcs["mpfr"](sample_list, output_dict)
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
         elif sample_list["task"] == "mlm":
             ouput_dict = self._forward_mlm(sample_list)
+        elif sample_list["task"] == "mpfr":
+            ouput_dict = self._forward_mpfr(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 

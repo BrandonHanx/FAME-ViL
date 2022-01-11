@@ -62,4 +62,4 @@ class EMAVectorQuantizer(nn.Module):
 
         z_q = rearrange(z_q, "b h w c -> b (h w) c").contiguous()
         z = rearrange(z, "b h w c -> b (h w) c").contiguous()
-        return torch.cat((z, z_q), dim=-1)
+        return z, z_q, encoding_indices

@@ -1683,9 +1683,9 @@ class BlockWiseMaskedPatchProcessor(BaseProcessor):
         self.height, self.width = input_size
         self.num_patches = self.height * self.width
 
-        self.num_masking_patches = config.get("num_masking_patches", 20)
+        self.num_masking_patches = config.get("num_masking_patches", 8)
         self.min_num_patches = config.get("min_num_patches", 4)
-        self.max_num_patches = config.get("max_num_patches", 16)
+        self.max_num_patches = config.get("max_num_patches", 8)
 
         min_aspect = config.get("min_aspect", 0.3)
         max_aspect = config.get("max_aspect", 1 / min_aspect)

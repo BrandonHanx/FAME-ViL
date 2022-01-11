@@ -23,8 +23,8 @@ dataset_config:
         test:
         - FACAD/test_info.json
     processors:
-        # masked_image_processor:
-        #   type: blockwise_masked_patch
+        masked_image_processor:
+          type: blockwise_masked_patch
         masked_token_processor:
           type: fashionvil_text_tokenizer
           params:
@@ -41,15 +41,16 @@ model_config:
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     task_for_inference: itc
-    lr_multiplier: 10
     tasks:
       - itm
       - itc
       - mlm
+      - mpfr
     task_probs:
-      - 0.4
-      - 0.3
-      - 0.3
+      - 0.25
+      - 0.25
+      - 0.25
+      - 0.25
 
 scheduler:
   type: multi_step
@@ -74,7 +75,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_itc_itm_mlm_improved
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfr
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360
