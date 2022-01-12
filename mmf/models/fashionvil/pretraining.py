@@ -112,7 +112,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         if sample_list["task"] == "mpfr":
             mask = sample_list["image_masks"] == 0
             mask = mask.float().unsqueeze(-1)
-            sample_list["image"] = sample_list["image"] * mask
+            sample_list["masked_image"] = sample_list["image"] * mask
         return sample_list
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
@@ -222,7 +222,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         hidden, _, _ = self.bert.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
-            sample_list["image"],
+            sample_list["masked_image"],
             sample_list["visual_embeddings_type"],
             sample_list["attention_mask"],
         )
