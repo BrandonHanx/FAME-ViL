@@ -1728,7 +1728,6 @@ class BlockWiseMaskedPatchProcessor(BaseProcessor):
                 break
             else:
                 mask_count += delta
-        mask[mask == 0] = -1
         return mask.view(-1)
 
 

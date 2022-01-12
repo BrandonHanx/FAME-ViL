@@ -109,6 +109,10 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 ),
                 dim=-1,
             )
+        if sample_list["task"] == "mpfr":
+            mask = sample_list["image_masks"] == 0
+            mask = mask.float().unsqueeze(-1)
+            sample_list["image"] = sample_list["image"] * mask
         return sample_list
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:

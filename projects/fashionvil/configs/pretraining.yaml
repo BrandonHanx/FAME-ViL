@@ -41,6 +41,7 @@ model_config:
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     task_for_inference: itc
+    lr_multiplier: 10
     tasks:
       - itm
       - itc
@@ -75,7 +76,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfr
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfr_fix
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

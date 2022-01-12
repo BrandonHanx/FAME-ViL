@@ -49,7 +49,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq_e2e_fix
+  experiment_name: fashionvil_composition_fashioniq_e2e
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960

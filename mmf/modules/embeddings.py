@@ -407,11 +407,12 @@ class BertVisioLinguisticEmbeddings(BertEmbeddings):
                 + self.position_embeddings_visual(position_ids_visual)
             )
         else:
-            position_ids_visual = torch.zeros(
-                visual_embeddings.size()[:-1],
+            b, l, _ = visual_embeddings.shape
+            position_ids_visual = torch.arange(
+                l,
                 dtype=torch.long,
                 device=visual_embeddings.device,
-            )
+            ).repeat(b, 1)
             position_embeddings_visual = self.position_embeddings_visual(
                 position_ids_visual
             )

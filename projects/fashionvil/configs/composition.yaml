@@ -13,7 +13,6 @@ model_config:
     bert_model_name: bert-base-uncased
     training_head_type: composition
     bypass_transformer: false
-    lr_multiplier: 20
     losses:
       - type: bbc_loss
 
@@ -40,7 +39,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq_20
+  experiment_name: fashionvil_composition_fashioniq_fix
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960
