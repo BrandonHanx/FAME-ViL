@@ -9,6 +9,13 @@ dataset_config:
     use_features: false
     use_patch_labels: true
     false_caption: false
+    images:
+        train:
+        - FACAD/train
+        val:
+        - FACAD/test
+        test:
+        - FACAD/test
     features:
         train:
         - FACAD/train_features
