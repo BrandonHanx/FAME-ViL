@@ -85,4 +85,7 @@ class FACADDataset(MMFDataset):
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = torch.tensor(is_correct, dtype=torch.long)
 
+        if "patch_labels" in sample_info:
+            current_sample.patch_labels = torch.tensor(sample_info["patch_labels"], dtype=torch.long)
+
         return current_sample

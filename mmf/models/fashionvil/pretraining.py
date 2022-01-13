@@ -65,6 +65,14 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.heads["mpfr"][1].bias = nn.Parameter(
                 torch.zeros(self.config.visual_embedding_dim)
             )
+        if "mpfc" in self.tasks:
+            self.heads["mpfc"] = nn.Sequential(
+                BertPredictionHeadTransform(self.bert.config),
+                nn.Linear(
+                    self.bert.config.hidden_size,
+                    1024,
+                ),
+            )
 
     def init_losses(self):
         if "itm" in self.tasks:
@@ -75,6 +83,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["mlm"] = CrossEntropyLoss(ignore_index=-1)
         if "mpfr" in self.tasks:
             self.loss_funcs["mpfr"] = MSELoss()
+        if "mpfc" in self.tasks:
+            self.loss_funcs["mpfc"] = CrossEntropyLoss()
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
@@ -90,6 +100,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             to_be_flattened += ["lm_label_ids", "input_ids_masked"]
         elif sample_list["task"] == "mpfr":
             to_be_flattened += ["image_masks"]
+        elif sample_list["task"] == "mpfc":
+            to_be_flattened += ["image_masks", "patch_labels"]
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
@@ -101,7 +113,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         sample_list["visual_embeddings_type"] = torch.zeros(
             (b, l), device=device
         ).long()
-        if sample_list["task"] in ["itm", "mlm", "mpfr"]:
+        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -109,7 +121,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 ),
                 dim=-1,
             )
-        if sample_list["task"] == "mpfr":
+        if sample_list["task"] in ["mpfr", "mpfc"]:
             mask = sample_list["image_masks"] == 0
             mask = mask.float().unsqueeze(-1)
             sample_list["masked_image"] = sample_list["image"] * mask
@@ -250,6 +262,39 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_mpfc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        hidden, _, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["masked_image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
+        )
+        _, num_visual_tokens, visual_dim = sample_list["image"].shape
+
+        mask = sample_list["image_masks"] == 1
+
+        hidden = hidden[:, -num_visual_tokens:]
+        hidden_masked = (
+            hidden[mask.unsqueeze(-1).expand_as(hidden)]
+            .contiguous()
+            .view(-1, hidden.size(-1))
+        )
+        logits = self.heads["mpfc"](hidden_masked)
+
+        target = sample_list["patch_labels"]
+        target_masked = target[mask].contiguous().view(-1)
+
+        sample_list["targets"] = target_masked
+
+        output_dict = {"scores": logits}
+
+        loss = {}
+        loss["mpfc_loss"] = self.loss_funcs["mpfc"](sample_list, output_dict)
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
@@ -257,6 +302,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             ouput_dict = self._forward_mlm(sample_list)
         elif sample_list["task"] == "mpfr":
             ouput_dict = self._forward_mpfr(sample_list)
+        elif sample_list["task"] == "mpfc":
+            ouput_dict = self._forward_mpfc(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 

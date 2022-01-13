@@ -7,6 +7,7 @@ dataset_config:
   facad:
     use_images: false
     use_features: true
+    use_patch_labels: true
     false_caption: false
     features:
         train:
@@ -46,7 +47,7 @@ model_config:
       - itm
       - itc
       - mlm
-      - mpfr
+      - mpfc
     task_probs:
       - 0.25
       - 0.25
@@ -76,7 +77,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfr_fix
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfc
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360

@@ -21,13 +21,25 @@ class FACADDatabase(torch.utils.data.Dataset):
         with PathManager.open(splits_path, "r") as f:
             annotations_json = json.load(f)
 
-        for item in annotations_json:
-            data.append(
-                {
-                    "image_path": item["image"],
-                    "sentences": item["color"] + " " + item["title"],
-                }
-            )
+        if self.config.use_patch_labels and self.dataset_type == "train":
+            with PathManager.open(splits_path.replace("_info", "_codes"), "r") as f:
+                patch_label_json = json.load(f)
+            for item in annotations_json:
+                data.append(
+                    {
+                        "image_path": item["image"],
+                        "sentences": item["color"] + " " + item["title"],
+                        "patch_labels": patch_label_json[item["image"].split(".")[0]],
+                    }
+                )
+        else:
+            for item in annotations_json:
+                data.append(
+                    {
+                        "image_path": item["image"],
+                        "sentences": item["color"] + " " + item["title"],
+                    }
+                )
 
         if len(data) == 0:
             raise RuntimeError("Dataset is empty")

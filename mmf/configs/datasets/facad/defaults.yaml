@@ -3,6 +3,7 @@ dataset_config:
       data_dir: ${env.data_dir}/datasets
       use_images: true
       use_features: false
+      use_patch_labels: false
       false_caption: false
       false_caption_probability: 0.5
       images:
