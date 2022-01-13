@@ -1716,7 +1716,6 @@ class BlockWiseMaskedPatchProcessor(BaseProcessor):
         return delta
 
     def __call__(self, x):
-        assert self.height * self.width == x.shape[0]
         mask = torch.zeros((self.height, self.width), dtype=torch.long)
         mask_count = 0
         while mask_count < self.num_masking_patches:

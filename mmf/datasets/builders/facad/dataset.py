@@ -80,8 +80,9 @@ class FACADDataset(MMFDataset):
             current_sample.image = self.image_db[idx]["images"][0]
         else:
             current_sample.image = self.features_db[idx]["image_feature_0"]
-            if hasattr(self, "masked_image_processor"):
-                current_sample.image_masks = self.masked_image_processor(current_sample.image)
+
+        if hasattr(self, "masked_image_processor"):
+            current_sample.image_masks = self.masked_image_processor(current_sample.image)
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = torch.tensor(is_correct, dtype=torch.long)
 
