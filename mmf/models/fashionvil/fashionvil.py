@@ -59,7 +59,7 @@ class FashionViL(BaseModel):
             }
         ]
         lr_filter = []
-        if self.training_head_type == "composition" and self.config.bypass_transformer:
+        if self.config.bypass_transformer:
             lr_filter.append("bert.embeddings.projection.weight")
             lr_filter.append("bert.embeddings.projection.bias")
         elif self.training_head_type == "classification":

@@ -18,7 +18,7 @@ model_config:
         zero_init_residual: false
         num_output_features: -1
         pool_type: avg
-    image_encoder_lr_multiplier: 20
+    lr_multiplier: 20
     direct_features_input: false
     bert_model_name: bert-base-uncased
     training_head_type: composition
