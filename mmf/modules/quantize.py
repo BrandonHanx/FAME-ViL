@@ -62,4 +62,5 @@ class EMAVectorQuantizer(nn.Module):
 
         z_q = rearrange(z_q, "b h w c -> b (h w) c").contiguous()
         z = rearrange(z, "b h w c -> b (h w) c").contiguous()
+        encoding_indices = encoding_indices.view(z.shape[:-1])
         return z, z_q, encoding_indices
