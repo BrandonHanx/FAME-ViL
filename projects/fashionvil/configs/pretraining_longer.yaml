@@ -1,0 +1,93 @@
+# FACAD data nums: 92342
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  facad:
+    use_images: false
+    use_features: true
+    use_patch_labels: true
+    false_caption: false
+    features:
+        train:
+        - FACAD/train_features
+        val:
+        - FACAD/test_features
+        test:
+        - FACAD/test_features
+    annotations:
+        train:
+        - FACAD/train_info.json
+        val:
+        - FACAD/test_info.json
+        test:
+        - FACAD/test_info.json
+    processors:
+        masked_image_processor:
+          type: blockwise_masked_patch
+        masked_token_processor:
+          type: fashionvil_text_tokenizer
+          params:
+            tokenizer_config:
+              type: bert-base-uncased
+              params:
+                do_lower_case: true
+            mask_probability: 0.15
+            max_seq_length: 50
+            do_whole_word_mask: true
+
+model_config:
+  fashionvil:
+    bert_model_name: bert-base-uncased
+    training_head_type: pretraining
+    task_for_inference: itc
+    lr_multiplier: 10
+    tasks:
+      - itm
+      - itc
+      - mlm
+      - mpfc
+    task_probs:
+      - 0.25
+      - 0.25
+      - 0.25
+      - 0.25
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 86520
+    - 173040
+    lr_ratio: 0.1
+    warmup_iterations: 14420
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 5e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+    - r@5_rev_retrieval
+
+training:
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfc_longer
+  batch_size: 128
+  lr_scheduler: true
+  max_updates: 230720
+  log_interval: 10
+  checkpoint_interval: 14420
+  evaluation_interval: 2884
+  early_stop:
+    criteria: facad/r@5_rev_retrieval
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
