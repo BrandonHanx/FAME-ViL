@@ -252,7 +252,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         target = sample_list["image"]
         target_masked = target[mask.expand_as(target)].contiguous().view(-1, visual_dim)
 
-        sample_list["targets"] = target_masked
+        sample_list["targets"] = target_masked.detach()
 
         output_dict = {"scores": predict_feat}
 

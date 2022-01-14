@@ -60,7 +60,7 @@ def extract_dataset(data_dir, out_json):
         resolution=224,
         num_tokens=1024,
         codebook_dim=256,
-        attn_resolutions=[14],
+        attn_resolutions=[7],
         hidden_dim=128,
         in_channels=3,
         ch_mult=[1, 1, 2, 2, 4, 4],

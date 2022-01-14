@@ -59,10 +59,9 @@ class FashionViL(BaseModel):
             }
         ]
         lr_filter = []
-        if self.config.bypass_transformer:
-            lr_filter.append("bert.embeddings.projection.weight")
-            lr_filter.append("bert.embeddings.projection.bias")
-        elif self.training_head_type == "classification":
+        lr_filter.append("bert.embeddings.projection.weight")
+        lr_filter.append("bert.embeddings.projection.bias")
+        if self.training_head_type == "classification":
             lr_filter.append("classifier")
         elif self.training_head_type == "pretraining":
             lr_filter.append("heads")

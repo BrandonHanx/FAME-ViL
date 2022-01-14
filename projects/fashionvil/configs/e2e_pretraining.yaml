@@ -55,7 +55,7 @@ model_config:
         num_output_features: -1
         pool_type: avg
     direct_features_input: false
-    bypass_transformer: true
+    bypass_transformer: false
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     task_for_inference: itc

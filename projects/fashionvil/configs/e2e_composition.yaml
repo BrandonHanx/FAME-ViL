@@ -64,8 +64,9 @@ training:
 
 run_type: train_val
 
-# checkpoint:
-#   resume_pretrained: true
-#   resume_file: save/fashionvil_pretrain_itc_itm/best.ckpt
-#   pretrained_state_mapping:
-#     model.bert: model.bert
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/fashionvil_e2e_pretrain_itc_itm_bypass/best.ckpt
+  pretrained_state_mapping:
+    image_encoder: image_encoder
+    model.bert: model.bert
