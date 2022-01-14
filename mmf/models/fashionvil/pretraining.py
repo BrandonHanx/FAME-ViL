@@ -5,11 +5,13 @@ import random
 from copy import deepcopy
 from typing import Dict
 
+import numpy as np
 import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss, MSELoss
 from mmf.utils.configuration import get_mmf_cache_dir
+from mmf.utils.general import get_mmf_root
 from torch import Tensor, nn
 from transformers.modeling_bert import (
     BertOnlyNSPHead,
@@ -84,7 +86,12 @@ class FashionViLForPretraining(FashionViLBaseModel):
         if "mpfr" in self.tasks:
             self.loss_funcs["mpfr"] = MSELoss()
         if "mpfc" in self.tasks:
-            self.loss_funcs["mpfc"] = CrossEntropyLoss()
+            weight = np.load(
+                os.path.join(
+                    get_mmf_root(), "models/fashionvil/vqvae_cross_entropy_weight.npy"
+                )
+            )
+            self.loss_funcs["mpfc"] = CrossEntropyLoss(weight=torch.Tensor(weight))
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
