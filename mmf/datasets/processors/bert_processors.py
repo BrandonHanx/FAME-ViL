@@ -528,9 +528,20 @@ class FashionViLTextTokenizer(MaskedTokenProcessor):
         self._max_seq_length = config.get("max_seq_length", 25)
         self._probability = config.get("mask_probability", 0)
         self._do_whole_word_mask = config.get("do_whole_word_mask", False)
+        self._do_structured_mask = config.get("do_structured_mask", False)
+
+    def _get_text_tokens(self, item: Dict[str, Any]) -> Dict[str, torch.Tensor]:
+        text = item["text"]
+        tokens = self.tokenize(text)
+        # if self._do_structured_mask:
+        #     basic_tokens = self._tokenizer.basic_tokenizer.tokenize(text)
+        #     basic_tokens_tag = nltk.tag.pos_tag(basic_tokens)
+        self._truncate_seq_pair(tokens, None, self._max_seq_length)
+        output = self._convert_to_indices(tokens, probability=self._probability)
+        return output
 
     def __call__(self, item: Dict[str, Any]):
-        output = get_pair_text_tokens(item, self)
+        output = self._get_text_tokens(item)
         if "is_correct" in item:
             output["is_correct"] = torch.tensor(
                 item.get("is_correct", True), dtype=torch.long
@@ -538,12 +549,9 @@ class FashionViLTextTokenizer(MaskedTokenProcessor):
         return output
 
     def _token_transform(
-        self, tokens: List[str], tokens_b: Optional[List[str]] = None
+        self, tokens: List[str]
     ) -> Tuple[torch.Tensor, int, int, List[str]]:
         tokens = [self._CLS_TOKEN] + tokens + [self._SEP_TOKEN]
-        if tokens_b:
-            tokens += tokens_b + [self._SEP_TOKEN]
-
         input_ids = self._convert_tokens_to_ids(tokens)
         token_len = len(input_ids)
         token_pad = self._max_seq_length - token_len
@@ -589,40 +597,21 @@ class FashionViLTextTokenizer(MaskedTokenProcessor):
 
     def _convert_to_indices(
         self,
-        tokens_a: List[str],
-        tokens_b: Optional[List[str]] = None,
+        tokens: List[str],
         probability: float = 0.15,
     ) -> Dict[str, torch.Tensor]:
-        """
-        BERT encodes
-        - single sequence: ``[CLS] X [SEP]``
-        - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-        """
-        input_ids_original, _, _, tokens = self._token_transform(tokens_a, tokens_b)
+        input_ids_original, _, _, tokens_original = self._token_transform(tokens)
 
         if self._do_whole_word_mask:
-            tokens_a, label_a = self._random_whole_word(
-                tokens_a, probability=probability
-            )
+            tokens, label = self._random_whole_word(tokens, probability=probability)
         else:
-            tokens_a, label_a = self._random_word(tokens_a, probability=probability)
-        segment_ids = [0] * (len(tokens_a) + 2)
+            tokens, label = self._random_word(tokens, probability=probability)
 
-        if tokens_b:
-            if self._do_whole_word_mask:
-                tokens_b, label_b = self._random_whole_word(
-                    tokens_b, probability=probability
-                )
-            else:
-                tokens_b, label_b = self._random_word(tokens_b, probability=probability)
-            lm_label_ids = [-1] + label_a + [-1] + label_b + [-1]
-            assert len(tokens_b) > 0
-            segment_ids += [1] * (len(tokens_b) + 1)
-        else:
-            lm_label_ids = [-1] + label_a + [-1]
+        segment_ids = [0] * (len(tokens) + 2)
+        lm_label_ids = [-1] + label + [-1]
 
         input_ids_masked, token_len, token_pad, tokens_masked = self._token_transform(
-            tokens_a, tokens_b
+            tokens
         )
 
         input_mask = [1] * token_len + [0] * token_pad
@@ -640,7 +629,7 @@ class FashionViLTextTokenizer(MaskedTokenProcessor):
             "segment_ids": segment_ids,
             "lm_label_ids": lm_label_ids,
             "tokens_masked": tokens_masked,
-            "tokens": tokens,
+            "tokens": tokens_original,
         }
 
 
