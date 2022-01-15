@@ -77,7 +77,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfc_weighted
+  experiment_name: fashionvil_pretrain_itc_itm_mlm_mpfc
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360
