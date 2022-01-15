@@ -1259,6 +1259,70 @@ class RecallAtK_comp(BaseMetric):
         return ratk
 
 
+@registry.register_metric("r@k_general")
+class RecallAtK_general(BaseMetric):
+    def __init__(self, name="recall@k_general"):
+        super().__init__(name)
+        self.required_params = [
+            "scores",
+            "targets",
+            "image_id",
+            "text_id",
+        ]
+
+    def _get_rk(
+        self,
+        q_ids: Tensor,
+        g_ids: Tensor,
+        q_embeddings: Tensor,
+        g_embeddings: Tensor,
+        k: Tensor = torch.tensor([1, 5, 10], dtype=torch.long),
+    ):
+        # acclerate sort with topk
+        max_sim, indices = torch.topk(
+            q_embeddings @ g_embeddings.t(), k=max(k), dim=1, largest=True, sorted=True
+        )  # q * k
+        pred_labels = g_ids[indices]  # q * k
+        matches = pred_labels.eq(q_ids.view(-1, 1))  # q * k
+
+        all_cmc = matches[:, : max(k)].cumsum(1)
+        all_cmc[all_cmc > 1] = 1
+        all_cmc = all_cmc.float().mean(0)
+        ratk = all_cmc[k - 1]
+        return ratk
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        image_embeddings = model_output["scores"]
+        text_embeddings = model_output["targets"]
+        image_ids = sample_list["image_id"].squeeze()
+        text_ids = sample_list["text_id"].squeeze()
+
+        keys = [
+            f"i2t_r@1",
+            f"i2t_r@5",
+            f"i2t_r@10",
+            f"t2i_r@1",
+            f"t2i_r@5",
+            f"t2i_r@10",
+            f"avg",
+        ]
+        values = torch.zeros(7, device=image_embeddings.device)
+        values[:3] = self._get_rk(
+            image_ids, text_ids, image_embeddings, text_embeddings
+        )
+        values[3:6] = self._get_rk(
+            text_ids, image_ids, text_embeddings, image_embeddings
+        )
+        values[6] = torch.mean(values[:-1])
+        return dict(zip(keys, values))
+
+
 @registry.register_metric("r@k_fashioniq")
 class RecallAtK_fashioniq(BaseMetric):
     """

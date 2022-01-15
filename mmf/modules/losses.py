@@ -740,7 +740,9 @@ class InBatchHinge(nn.Module):
             loss = self._compute_loss(correlations)
         else:
             # Evaluation/Multi-GT loss
-            assert text_embeddings.shape[0] % image_embeddings.shape[0] == 0
+            # FIXME: maybe we can donot use val loss
+            if text_embeddings.shape[0] % image_embeddings.shape[0] != 0:
+                return 0
 
             batch_size, dim_size = image_embeddings.shape
             factor = text_embeddings.shape[0] // image_embeddings.shape[0]
@@ -790,7 +792,10 @@ class ContrastiveLoss(nn.Module):
         embedding_1 = model_output["scores"]
         embedding_2 = model_output["targets"]
 
-        assert embedding_1.size(0) == embedding_2.size(0), "batch size must match"
+        # FIXME: maybe we can donot use val loss
+        if embedding_1.size(0) != embedding_2.size(0):
+            return 0
+
         per_gpu_batch_size = embedding_1.size(0)
 
         embedding_1_all_gpus = gather_tensor_along_batch_with_backward(embedding_1)

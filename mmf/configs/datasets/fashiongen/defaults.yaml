@@ -1,0 +1,67 @@
+dataset_config:
+  fashiongen:
+      data_dir: ${env.data_dir}/datasets
+      use_images: true
+      use_features: false
+      use_patch_labels: false
+      images:
+        train:
+        - FashionGen/train
+        val:
+        - FashionGen/val
+        test:
+        - FashionGen/val
+      annotations:
+        train:
+        - FashionGen/train_info.json
+        val:
+        - FashionGen/val_info.json
+        test:
+        - FashionGen/val_info.json
+      features:
+        train:
+        - FashionGen/train_features
+        val:
+        - FashionGen/val_features
+        test:
+        - FashionGen/val_features
+      processors:
+        text_processor:
+          type: bert_tokenizer
+          params:
+            tokenizer_config:
+              type: bert-base-uncased
+              params:
+                do_lower_case: true
+            mask_probability: 0
+            max_seq_length: 100
+        train_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: Resize
+                params:
+                  size: [256, 256]
+              - type: RandomCrop
+                params:
+                  size: [224, 224]
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]
+        eval_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: Resize
+                params:
+                  size: [256, 256]
+              - type: CenterCrop
+                params:
+                  size: [224, 224]
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]

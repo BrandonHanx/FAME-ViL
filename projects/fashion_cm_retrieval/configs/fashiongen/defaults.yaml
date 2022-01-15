@@ -1,0 +1,47 @@
+# FashionGen data nums: 60147
+
+includes:
+- configs/models/alignment/defaults.yaml
+
+model_config:
+  cm_shared_transformer:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: false
+    lr_steps:
+    - 28170
+    - 56340
+    lr_ratio: 0.1
+    warmup_iterations: 939
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-4
+    eps: 1e-8
+
+evaluation:
+  metrics:
+  - r@k_general
+
+training:
+  experiment_name: cm_shared_transformer_fashiongen
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 75120
+  log_interval: 10
+  checkpoint_interval: 939
+  evaluation_interval: 939
+  wandb:
+    enabled: true
+
+run_type: train_val

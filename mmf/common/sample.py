@@ -107,27 +107,26 @@ class SampleList(OrderedDict):
         fields = samples[0].keys()
 
         for field in fields:
-            if isinstance(samples[0][field], torch.Tensor):
-                size = (len(samples), *samples[0][field].size())
-                self[field] = samples[0][field].new_empty(size)
-                if self._get_tensor_field() is None:
-                    self._set_tensor_field(field)
-            else:
-                self[field] = [None for _ in range(len(samples))]
+            self[field] = [None for _ in range(len(samples))]
 
+            cat_tensor = False
             for idx, sample in enumerate(samples):
-                # it should be a tensor but not a 0-d tensor
                 if (
                     isinstance(sample[field], torch.Tensor)
                     and len(sample[field].size()) != 0
                     and sample[field].size(0) != samples[0][field].size(0)
                 ):
-                    raise AssertionError(
-                        "Fields for all samples must be equally sized. "
-                        "{} is of different sizes".format(field)
-                    )
+                    cat_tensor = True
 
                 self[field][idx] = self._get_data_copy(sample[field])
+
+            if isinstance(samples[0][field], torch.Tensor):
+                if cat_tensor:
+                    self[field] = torch.cat(self[field], dim=0)
+                else:
+                    self[field] = torch.stack(self[field])
+                if self._get_tensor_field() is None:
+                    self._set_tensor_field(field)
 
             if isinstance(samples[0][field], collections.abc.Mapping):
                 self[field] = SampleList(self[field])
@@ -293,24 +292,25 @@ class SampleList(OrderedDict):
             data (object): Data to be added, can be a ``torch.Tensor``, ``list``
                          or ``Sample``
         """
-        fields = self.fields()
+        # fields = self.fields()
         tensor_field = self._get_tensor_field()
 
-        if (
-            len(fields) != 0
-            and isinstance(data, torch.Tensor)
-            and len(data.size()) != 0
-            and tensor_field is not None
-            and data.size(0) != self[tensor_field].size(0)
-        ):
-            raise AssertionError(
-                "A tensor field to be added must "
-                "have same size as existing tensor "
-                "fields in SampleList. "
-                "Passed size: {}, Required size: {}".format(
-                    len(data), len(self[tensor_field])
-                )
-            )
+        # FIXME: comment this for FashionGen and FACAD retrieval setting
+        # if (
+        #     len(fields) != 0
+        #     and isinstance(data, torch.Tensor)
+        #     and len(data.size()) != 0
+        #     and tensor_field is not None
+        #     and data.size(0) != self[tensor_field].size(0)
+        # ):
+        #     raise AssertionError(
+        #         "A tensor field to be added must "
+        #         "have same size as existing tensor "
+        #         "fields in SampleList. "
+        #         "Passed size: {}, Required size: {}".format(
+        #             len(data), len(self[tensor_field])
+        #         )
+        #     )
 
         if isinstance(data, collections.abc.Mapping):
             self[field] = SampleList(data)
