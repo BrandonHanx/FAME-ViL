@@ -5,24 +5,13 @@ includes:
 
 dataset_config:
   fashiongen:
-    use_images: true
-    use_features: false
+    use_images: false
+    use_features: true
 
 model_config:
   fashionvil:
-    image_encoder:
-      type: torchvision_resnet
-      params:
-        name: resnet50
-        pretrained: true
-        zero_init_residual: false
-        num_output_features: -1
-        pool_type: avg
-    lr_multiplier: 20
-    direct_features_input: false
     bert_model_name: bert-base-uncased
     training_head_type: contrastive
-    bypass_transformer: true
     losses:
       - type: contrastive_loss
 
@@ -40,7 +29,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 1e-5
+    lr: 5e-5
     eps: 1e-8
     weight_decay: 1e-4
 
@@ -49,7 +38,7 @@ evaluation:
     - r@k_general
 
 training:
-  experiment_name: fashionvil_contrastive_fashiongen_e2e
+  experiment_name: fashionvil_contrastive_fashiongen
   batch_size: 64
   lr_scheduler: true
   max_updates: 75120
@@ -63,10 +52,3 @@ training:
     enabled: true
 
 run_type: train_val
-
-# checkpoint:
-#   resume_pretrained: true
-#   resume_file: save/fashionvil_e2e_pretrain_itc_itm_bypass/best.ckpt
-#   pretrained_state_mapping:
-#     image_encoder: image_encoder
-#     model.bert: model.bert

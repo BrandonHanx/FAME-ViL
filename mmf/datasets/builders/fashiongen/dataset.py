@@ -65,11 +65,24 @@ class FashionGenDataset(MMFDataset):
         image_path = sample_info["image_path"]
         if self._dataset_type == "train":
             image_path = random.choices(image_path)[0]
-            current_sample.image = self.image_db.from_path(image_path)["images"][0]
+            if self._use_images:
+                current_sample.image = self.image_db.from_path(image_path)["images"][0]
+            elif self._use_features:
+                feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
+                current_sample.image = self.features_db.from_path(feature_path)["image_feature_0"]
         else:
-            images = self.image_db.from_path(image_path)["images"]
-            images = torch.stack(images)
-            current_sample.image = images
+            if self._use_images:
+                images = self.image_db.from_path(image_path)["images"]
+                images = torch.stack(images)
+                current_sample.image = images
+            elif self._use_features:
+                features = []
+                for p in image_path:
+                    feature_path = ".".join(p.split(".")[:-1]) + ".npy"
+                    features.append(self.features_db.from_path(feature_path)["image_feature_0"])
+                features = torch.stack(features)
+                current_sample.image = features
+
             current_sample.text_id = torch.tensor(sample_info["id"], dtype=torch.long)
             current_sample.image_id = current_sample.text_id.repeat(len(image_path), 1)
 
