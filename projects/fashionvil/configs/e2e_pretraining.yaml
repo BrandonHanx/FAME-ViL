@@ -55,7 +55,7 @@ model_config:
         num_output_features: -1
         pool_type: avg
     direct_features_input: false
-    bypass_transformer: false
+    bypass_transformer: true
     bert_model_name: bert-base-uncased
     training_head_type: pretraining
     task_for_inference: itc
@@ -64,12 +64,12 @@ model_config:
       - itm
       - itc
       - mlm
-      - mpfr
+      # - mpfr
     task_probs:
       - 0.25
       - 0.25
       - 0.25
-      - 0.25
+      # - 0.25
 
 scheduler:
   type: multi_step
@@ -94,7 +94,7 @@ evaluation:
     - r@5_rev_retrieval
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_itc_itm_mlm_mpfr
+  experiment_name: fashionvil_e2e_pretrain_bypass_itc_itm_mlm
   batch_size: 64
   lr_scheduler: true
   max_updates: 115360
