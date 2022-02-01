@@ -6,12 +6,13 @@ import torch
 from mmf.common.sample import Sample
 from mmf.common.typings import MMFDatasetConfigType
 from mmf.datasets.mmf_dataset import MMFDataset
-from .database import FashionGenDatabase
+from .database import FashionGenDatabase, Fashion200kDatabase, BigFACADDatabase, PolyvoreOutfitsDatabase
 
 
-class FashionGenDataset(MMFDataset):
+class FashionAllDataset(MMFDataset):
     def __init__(
         self,
+        name: str,
         config: MMFDatasetConfigType,
         dataset_type: str,
         index: int,
@@ -19,11 +20,10 @@ class FashionGenDataset(MMFDataset):
         **kwargs,
     ):
         super().__init__(
-            "fashiongen",
+            name,
             config,
             dataset_type,
             index,
-            FashionGenDatabase,
             *args,
             **kwargs,
         )
@@ -45,7 +45,6 @@ class FashionGenDataset(MMFDataset):
             return "sentences"
 
         raise AttributeError("No valid text attribution was found")
-
 
     def __getitem__(self, idx):
         sample_info = self.annotation_db[idx]
@@ -89,4 +88,87 @@ class FashionGenDataset(MMFDataset):
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = None
 
+        if hasattr(self, "masked_image_processor"):
+            current_sample.image_masks = self.masked_image_processor(current_sample.image)
+
         return current_sample
+
+
+class FashionGenDataset(FashionAllDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "fashiongen",
+            config,
+            dataset_type,
+            index,
+            FashionGenDatabase,
+            *args,
+            **kwargs,
+        )
+
+
+class Fashion200kDataset(FashionAllDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "fashion200k",
+            config,
+            dataset_type,
+            index,
+            Fashion200kDatabase,
+            *args,
+            **kwargs,
+        )
+
+
+class BigFACADDataset(FashionAllDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "big_facad",
+            config,
+            dataset_type,
+            index,
+            BigFACADDatabase,
+            *args,
+            **kwargs,
+        )
+
+
+class PolyvoreOutfitsDataset(FashionAllDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "polyvore_outfits",
+            config,
+            dataset_type,
+            index,
+            PolyvoreOutfitsDatabase,
+            *args,
+            **kwargs,
+        )
