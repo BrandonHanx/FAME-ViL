@@ -5,6 +5,11 @@ model_config:
       params:
         in_dim: 2048
         out_dim: 2048
+    image_tokenizer:
+      type: identity
+      params:
+        in_dim: 2048
+        out_dim: 2048
     direct_features_input: true
     bert_model_name: bert-base-uncased
     training_head_type: pretraining

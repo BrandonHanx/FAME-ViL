@@ -87,7 +87,7 @@ def optimal_transport_dist(
     k: int = 1,
 ) -> Tensor:
     """[B, M, D], [B, N, D], [B, M], [B, N]"""
-    cost = cost_matrix_cosine(txt_emb, img_emb)
+    cost = cost_matrix_cosine(txt_emb, img_emb)  # [B, M, N]
     # mask the padded inputs
     joint_pad = txt_pad.unsqueeze(-1) | img_pad.unsqueeze(-2)
     cost.masked_fill_(joint_pad, 0)
