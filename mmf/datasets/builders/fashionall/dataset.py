@@ -86,7 +86,7 @@ class FashionAllDataset(MMFDataset):
             current_sample.image_id = current_sample.text_id.repeat(len(image_path), 1)
 
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
-        current_sample.targets = None
+        current_sample.targets = torch.tensor(1, dtype=torch.long)
 
         if hasattr(self, "masked_image_processor"):
             current_sample.image_masks = self.masked_image_processor(current_sample.image)

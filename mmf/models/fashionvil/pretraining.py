@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
 import os
-import random
 from copy import deepcopy
 from typing import Dict
 
@@ -10,6 +9,7 @@ from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss, MSELoss
 from mmf.utils.configuration import get_mmf_cache_dir
+from mmf.utils.distributed import broadcast_tensor
 from torch import Tensor, nn
 from transformers.modeling_bert import (
     BertOnlyNSPHead,
@@ -23,7 +23,6 @@ class FashionViLForPretraining(FashionViLBaseModel):
         super().__init__(config)
         self.task_for_inference = config.task_for_inference
         self.tasks = config.tasks
-        self.task_probs = config.task_probs
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
 
@@ -88,7 +87,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
-            sample_list["task"] = random.choices(self.tasks, weights=self.task_probs)[0]
+            random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)))
+            sample_list["task"] = self.tasks[random_idx.item()]
         else:
             sample_list["task"] = self.task_for_inference
         return sample_list
