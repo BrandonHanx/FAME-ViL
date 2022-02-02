@@ -21,7 +21,7 @@ dataset_config:
               params:
                 do_lower_case: true
             mask_probability: 0.15
-            max_seq_length: 50
+            max_seq_length: 75
             do_whole_word_mask: true
   fashiongen:
     processors:
@@ -35,7 +35,7 @@ dataset_config:
               params:
                 do_lower_case: true
             mask_probability: 0.15
-            max_seq_length: 50
+            max_seq_length: 75
             do_whole_word_mask: true
   fashion200k:
     processors:
@@ -49,7 +49,7 @@ dataset_config:
               params:
                 do_lower_case: true
             mask_probability: 0.15
-            max_seq_length: 50
+            max_seq_length: 75
             do_whole_word_mask: true
   polyvore_outfits:
     processors:
@@ -63,7 +63,7 @@ dataset_config:
               params:
                 do_lower_case: true
             mask_probability: 0.15
-            max_seq_length: 50
+            max_seq_length: 75
             do_whole_word_mask: true
 
 
@@ -80,7 +80,7 @@ model_config:
     image_tokenizer:
       type: vqvae_encoder
       params:
-        pretrained_path: ${env.data_dir}/pretrained_models/vqvae_ema_pp_224_7x7_encoder.pth
+        pretrained_path: ${env.data_dir}/pretrained_models/vqvae_ema_pp_224_7x7_encoder_fashionall.pth
         resolution: 224
         num_tokens: 1024
         codebook_dim: 256

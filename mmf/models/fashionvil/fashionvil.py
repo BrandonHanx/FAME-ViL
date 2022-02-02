@@ -96,7 +96,6 @@ class FashionViL(BaseModel):
             sample_list.ref_image = self.image_encoder(sample_list.ref_image)
             sample_list.tar_image = self.image_encoder(sample_list.tar_image)
         else:
-            print(sample_list.image.shape, "+++++")
             image_features = self.image_encoder(sample_list.image)
             if self.image_tokenizer is not None and self.training:
                 sample_list.patch_labels = self.get_patch_labels(sample_list.image)
