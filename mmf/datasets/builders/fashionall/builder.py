@@ -1,5 +1,5 @@
 from mmf.common.registry import registry
-from .dataset import FashionGenDataset, Fashion200kDataset, BigFACADDataset, PolyvoreOutfitsDataset
+from .dataset import FashionAllDataset, FashionGenDataset, Fashion200kDataset, BigFACADDataset, PolyvoreOutfitsDataset
 from mmf.datasets.mmf_dataset_builder import MMFDatasetBuilder
 
 
@@ -49,3 +49,15 @@ class PolyvoreOutfitsBuilder(MMFDatasetBuilder):
     @classmethod
     def config_path(cls):
         return "configs/datasets/polyvore_outfits/defaults.yaml"
+
+
+@registry.register_builder("fashionall")
+class FashionAllBuilder(MMFDatasetBuilder):
+    def __init__(
+        self, dataset_name="fashionall", dataset_class=FashionAllDataset, *args, **kwargs
+    ):
+        super().__init__(dataset_name, dataset_class, *args, **kwargs)
+
+    @classmethod
+    def config_path(cls):
+        return "configs/datasets/fashionall/defaults.yaml"

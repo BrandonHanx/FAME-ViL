@@ -6,10 +6,10 @@ import torch
 from mmf.common.sample import Sample
 from mmf.common.typings import MMFDatasetConfigType
 from mmf.datasets.mmf_dataset import MMFDataset
-from .database import FashionGenDatabase, Fashion200kDatabase, BigFACADDatabase, PolyvoreOutfitsDatabase
+from .database import FashionAllDatabase, FashionGenDatabase, Fashion200kDatabase, BigFACADDatabase, PolyvoreOutfitsDatabase
 
 
-class FashionAllDataset(MMFDataset):
+class FashionDataset(MMFDataset):
     def __init__(
         self,
         name: str,
@@ -94,7 +94,7 @@ class FashionAllDataset(MMFDataset):
         return current_sample
 
 
-class FashionGenDataset(FashionAllDataset):
+class FashionGenDataset(FashionDataset):
     def __init__(
         self,
         config: MMFDatasetConfigType,
@@ -114,7 +114,7 @@ class FashionGenDataset(FashionAllDataset):
         )
 
 
-class Fashion200kDataset(FashionAllDataset):
+class Fashion200kDataset(FashionDataset):
     def __init__(
         self,
         config: MMFDatasetConfigType,
@@ -134,7 +134,7 @@ class Fashion200kDataset(FashionAllDataset):
         )
 
 
-class BigFACADDataset(FashionAllDataset):
+class BigFACADDataset(FashionDataset):
     def __init__(
         self,
         config: MMFDatasetConfigType,
@@ -154,7 +154,7 @@ class BigFACADDataset(FashionAllDataset):
         )
 
 
-class PolyvoreOutfitsDataset(FashionAllDataset):
+class PolyvoreOutfitsDataset(FashionDataset):
     def __init__(
         self,
         config: MMFDatasetConfigType,
@@ -169,6 +169,26 @@ class PolyvoreOutfitsDataset(FashionAllDataset):
             dataset_type,
             index,
             PolyvoreOutfitsDatabase,
+            *args,
+            **kwargs,
+        )
+
+
+class FashionAllDataset(FashionDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "fashionall",
+            config,
+            dataset_type,
+            index,
+            FashionAllDatabase,
             *args,
             **kwargs,
         )

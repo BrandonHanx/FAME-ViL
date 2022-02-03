@@ -36,7 +36,7 @@ except ImportError:
     pass
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class Encoder(nn.Module):
