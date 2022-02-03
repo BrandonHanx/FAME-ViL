@@ -87,7 +87,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
-            random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)))
+            random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)).cuda())
             sample_list["task"] = self.tasks[random_idx.item()]
         else:
             sample_list["task"] = self.task_for_inference

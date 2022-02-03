@@ -794,7 +794,7 @@ class ContrastiveLoss(nn.Module):
 
         # FIXME: maybe we can donot use val loss
         if embedding_1.size(0) != embedding_2.size(0):
-            return 0
+            return torch.tensor(0.0, device=embedding_1.device)
 
         per_gpu_batch_size = embedding_1.size(0)
 

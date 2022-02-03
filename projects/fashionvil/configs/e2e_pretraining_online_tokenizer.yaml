@@ -124,7 +124,7 @@ optimizer:
 
 evaluation:
   metrics:
-  - type: r@5_rev_retrieval
+  - type: r@k_general
     datasets:
     - fashiongen
     - fashion200k
@@ -141,9 +141,9 @@ training:
   evaluation_interval: 1500
   find_unused_parameters: true
   early_stop:
-    criteria: fashiongen/r@5_rev_retrieval
+    criteria: fashiongen/r@k_general/avg
     minimize: false
-  # wandb:
-  #   enabled: true
+  wandb:
+    enabled: true
 
 run_type: train_val
