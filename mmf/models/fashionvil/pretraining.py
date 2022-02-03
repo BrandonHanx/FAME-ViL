@@ -96,10 +96,18 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["mpfc"] = CrossEntropyLoss()
 
     @torch.no_grad()
-    def get_patch_labels(self, image):
+    def get_patch_labels(self, image, chunk_size=8):
+        batch_size = image.shape[0]
+        assert batch_size % chunk_size == 0
         # We need to override eval() as this image_tokenizer is a submodule
         self.image_tokenizer = self.image_tokenizer.eval()
-        _, _, indices = self.image_tokenizer(image)
+        indices = []
+        for i in range(batch_size // chunk_size):
+            _, _, idx = self.image_tokenizer(
+                image[i * chunk_size : (i + 1) * chunk_size]
+            )
+            indices.append(idx)
+        indices = torch.cat(indices, dim=0)
         return indices.long()
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
