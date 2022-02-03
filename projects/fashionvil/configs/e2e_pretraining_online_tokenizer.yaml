@@ -112,7 +112,7 @@ scheduler:
     - 45000
     - 90000
     lr_ratio: 0.1
-    warmup_iterations: 7500
+    warmup_iterations: 15000
     warmup_factor: 0.25
 
 optimizer:

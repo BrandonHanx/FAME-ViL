@@ -64,7 +64,7 @@ class NormalizationLayer(nn.Module):
             self.norm_s = nn.Parameter(torch.FloatTensor((self.norm_s,)))
 
     def forward(self, x, dim=-1):
-        features = self.norm_s * x / torch.norm(x, dim=dim, keepdim=True).expand_as(x)
+        features = self.norm_s * nn.functional.normalize(x, dim=dim)
         return features
 
 
