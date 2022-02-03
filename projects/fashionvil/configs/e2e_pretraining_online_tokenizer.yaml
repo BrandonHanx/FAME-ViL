@@ -9,7 +9,7 @@ includes:
 - configs/models/fashionvil/defaults.yaml
 
 dataset_config:
-  big_facad:
+  fashionall:
     processors:
         masked_image_processor:
           type: blockwise_masked_patch
@@ -23,49 +23,6 @@ dataset_config:
             mask_probability: 0.15
             max_seq_length: 75
             do_whole_word_mask: true
-  fashiongen:
-    processors:
-        masked_image_processor:
-          type: blockwise_masked_patch
-        masked_token_processor:
-          type: fashionvil_text_tokenizer
-          params:
-            tokenizer_config:
-              type: bert-base-uncased
-              params:
-                do_lower_case: true
-            mask_probability: 0.15
-            max_seq_length: 75
-            do_whole_word_mask: true
-  fashion200k:
-    processors:
-        masked_image_processor:
-          type: blockwise_masked_patch
-        masked_token_processor:
-          type: fashionvil_text_tokenizer
-          params:
-            tokenizer_config:
-              type: bert-base-uncased
-              params:
-                do_lower_case: true
-            mask_probability: 0.15
-            max_seq_length: 75
-            do_whole_word_mask: true
-  polyvore_outfits:
-    processors:
-        masked_image_processor:
-          type: blockwise_masked_patch
-        masked_token_processor:
-          type: fashionvil_text_tokenizer
-          params:
-            tokenizer_config:
-              type: bert-base-uncased
-              params:
-                do_lower_case: true
-            mask_probability: 0.15
-            max_seq_length: 75
-            do_whole_word_mask: true
-
 
 model_config:
   fashionvil:

@@ -8,6 +8,7 @@ import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss, MSELoss
+from mmf.utils.build import build_image_encoder
 from mmf.utils.configuration import get_mmf_cache_dir
 from mmf.utils.distributed import broadcast_tensor
 from torch import Tensor, nn
@@ -25,6 +26,15 @@ class FashionViLForPretraining(FashionViLBaseModel):
         self.tasks = config.tasks
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
+
+        if "mpfc" in config.tasks and config.bypass_transformer:
+            self.image_tokenizer = build_image_encoder(
+                config.image_tokenizer,
+                config.direct_features_input,
+            )
+            self.image_tokenizer = self.image_tokenizer.eval()
+            for param in self.image_tokenizer.parameters():
+                param.requires_grad = False
 
         self.init_heads()
         self.init_losses()
@@ -85,6 +95,13 @@ class FashionViLForPretraining(FashionViLBaseModel):
         if "mpfc" in self.tasks:
             self.loss_funcs["mpfc"] = CrossEntropyLoss()
 
+    @torch.no_grad()
+    def get_patch_labels(self, image):
+        # We need to override eval() as this image_tokenizer is a submodule
+        self.image_tokenizer = self.image_tokenizer.eval()
+        _, _, indices = self.image_tokenizer(image)
+        return indices.long()
+
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
             random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)).cuda())
@@ -101,7 +118,9 @@ class FashionViLForPretraining(FashionViLBaseModel):
         elif sample_list["task"] == "mpfr":
             to_be_flattened += ["image_masks"]
         elif sample_list["task"] == "mpfc":
-            to_be_flattened += ["image_masks", "patch_labels"]
+            to_be_flattened += ["image_masks"]
+            if "patch_labels" in sample_list.keys():
+                to_be_flattened += ["patch_labels"]
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
@@ -282,7 +301,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         )
         logits = self.heads["mpfc"](hidden_masked)
 
-        target = sample_list["patch_labels"]
+        target = self.get_patch_labels(sample_list["original_image"])
         target_masked = target[mask].contiguous().view(-1)
 
         sample_list["targets"] = target_masked
