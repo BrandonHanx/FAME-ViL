@@ -10,15 +10,9 @@ dataset_config:
         - FashionGen/train
         - PolyvoreOutfits/images
         val:
-        - BigFACAD/images
-        - Fashion200k/images
         - FashionGen/val
-        - PolyvoreOutfits/images
         test:
-        - BigFACAD/images
-        - Fashion200k/images
         - FashionGen/val
-        - PolyvoreOutfits/images
       annotations:
         train:
         - BigFACAD/train_info.json
@@ -26,15 +20,9 @@ dataset_config:
         - FashionGen/train_info.json
         - PolyvoreOutfits/train_info.json
         val:
-        - BigFACAD/val_info.json
-        - Fashion200k/test_info.json
         - FashionGen/val_info.json
-        - PolyvoreOutfits/val_info.json
         test:
-        - BigFACAD/val_info.json
-        - Fashion200k/test_info.json
         - FashionGen/val_info.json
-        - PolyvoreOutfits/test_info.json
       features:
         train:
         - BigFACAD/image_features
@@ -42,15 +30,9 @@ dataset_config:
         - FashionGen/train_features
         - PolyvoreOutfits/train_features
         val:
-        - BigFACAD/image_features
-        - Fashion200k/image_features
         - FashionGen/val_features
-        - PolyvoreOutfits/val_features
         test:
-        - BigFACAD/image_features
-        - Fashion200k/image_features
         - FashionGen/val_features
-        - PolyvoreOutfits/test_features
       processors:
         text_processor:
           type: bert_tokenizer

@@ -2,6 +2,7 @@
 
 from typing import Dict
 
+import torch
 from mmf.common.registry import registry
 from mmf.models import BaseModel
 from mmf.models.fashionvil.classification import FashionViLForClassification
@@ -80,6 +81,9 @@ class FashionViL(BaseModel):
             sample_list.ref_image = self.image_encoder(sample_list.ref_image)
             sample_list.tar_image = self.image_encoder(sample_list.tar_image)
         else:
-            sample_list.original_image = sample_list.image.squeeze()
-            sample_list.image = self.image_encoder(sample_list.image.squeeze())
+            if len(sample_list.image.shape) > 4:
+                sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
+                sample_list.image_id = torch.flatten(sample_list.image_id, end_dim=-2)
+            sample_list.original_image = sample_list.image
+            sample_list.image = self.image_encoder(sample_list.image)
         return self.model(sample_list)

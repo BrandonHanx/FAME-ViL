@@ -59,7 +59,7 @@ model_config:
       - itm
       - itc
       - mlm
-      - mpfc
+      # - mpfc
 
 scheduler:
   type: multi_step
@@ -82,15 +82,10 @@ optimizer:
 evaluation:
   metrics:
   - type: r@k_general
-    datasets:
-    - fashiongen
-    - fashion200k
-    - big_facad
-    - polyvore_outfits
 
 training:
   experiment_name: fashionvil_e2e_pretrain_baseline
-  batch_size: 128
+  batch_size: 256
   lr_scheduler: true
   max_updates: 120000
   log_interval: 10
@@ -98,7 +93,7 @@ training:
   evaluation_interval: 1500
   find_unused_parameters: true
   early_stop:
-    criteria: fashiongen/r@k_general/avg
+    criteria: fashionall/r@k_general/avg
     minimize: false
   wandb:
     enabled: true
