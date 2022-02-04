@@ -323,7 +323,7 @@ def build_dataloader_and_sampler(
         collate_fn=BatchCollator(
             dataset_instance.dataset_name, dataset_instance.dataset_type
         ),
-        drop_last=is_xla(),  # see also MultiDatasetLoader.__len__
+        drop_last=(is_xla() or dataset_instance.dataset_type == "train"),  # see also MultiDatasetLoader.__len__
         **other_args,
     )
 
@@ -380,7 +380,9 @@ def _add_extra_args_for_dataloader(
     # In distributed mode, we use DistributedSampler from PyTorch
     if is_dist_initialized():
         other_args["sampler"] = torch.utils.data.DistributedSampler(
-            dataset_instance, shuffle=other_args["shuffle"]
+            dataset_instance,
+            shuffle=other_args["shuffle"],
+            drop_last=(dataset_type == "train"),
         )
         # Shuffle is mutually exclusive with sampler, let DistributedSampler
         # take care of shuffle and pop from main args

@@ -59,7 +59,7 @@ model_config:
       - itm
       - itc
       - mlm
-      # - mpfc
+      - mpfc
 
 scheduler:
   type: multi_step
