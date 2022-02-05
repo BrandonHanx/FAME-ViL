@@ -49,7 +49,7 @@ evaluation:
     - r@k_general
 
 training:
-  experiment_name: fashionvil_contrastive_fashiongen_e2e
+  experiment_name: fashionvil_contrastive_fashiongen_e2e_pretrain_baseline
   batch_size: 64
   lr_scheduler: true
   max_updates: 75120
@@ -64,9 +64,9 @@ training:
 
 run_type: train_val
 
-# checkpoint:
-#   resume_pretrained: true
-#   resume_file: save/fashionvil_e2e_pretrain_itc_itm_bypass/best.ckpt
-#   pretrained_state_mapping:
-#     image_encoder: image_encoder
-#     model.bert: model.bert
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
+  pretrained_state_mapping:
+    image_encoder: image_encoder
+    model.bert: model.bert
