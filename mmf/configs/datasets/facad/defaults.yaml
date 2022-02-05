@@ -47,6 +47,7 @@ dataset_config:
               - type: RandomCrop
                 params:
                   size: [224, 224]
+              - RandomHorizontalFlip
               - ToTensor
               - type: Normalize
                 params:
