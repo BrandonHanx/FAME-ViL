@@ -60,6 +60,7 @@ model_config:
       - itc
       - mlm
       - mpfc
+      - 2wpa
 
 scheduler:
   type: multi_step
@@ -84,7 +85,7 @@ evaluation:
   - type: r@k_general
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_baseline
+  experiment_name: fashionvil_e2e_pretrain_stable_wpa
   batch_size: 256
   lr_scheduler: true
   max_updates: 120000

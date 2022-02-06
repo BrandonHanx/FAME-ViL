@@ -8,6 +8,7 @@ import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import ContrastiveLoss, CrossEntropyLoss, MSELoss
+from mmf.modules.ot import optimal_transport_dist
 from mmf.utils.build import build_image_encoder
 from mmf.utils.configuration import get_mmf_cache_dir
 from mmf.utils.distributed import broadcast_tensor
@@ -110,6 +111,41 @@ class FashionViLForPretraining(FashionViLBaseModel):
         indices = torch.cat(indices, dim=0)
         return indices.long()
 
+    @torch.no_grad()
+    def get_hard_pairs(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        # Hard negative pairs mining
+        # FIXME: not support multi-gpu mining
+        if self.training:
+            reset_train = True
+            self.eval()
+        else:
+            reset_train = False
+
+        itc_dict = self._forward_itc(sample_list)
+        image_embeddings = itc_dict["scores"]
+        text_embeddings = itc_dict["targets"]
+        correlations = image_embeddings @ text_embeddings.t()
+        batch_size = correlations.shape[0]
+        diag = torch.eye(batch_size).bool()
+        correlations[diag] = -1
+        # FIXME: more complicated sampling strategy
+        hard_text_index = torch.argmax(correlations, dim=1)
+        combine_index = torch.arange(batch_size).to(image_embeddings.device)
+        combine_index_index = torch.rand(batch_size) > 0.5
+        combine_index[combine_index_index] = hard_text_index[combine_index_index]
+
+        if reset_train:
+            self.train()
+
+        sample_list["input_ids"] = sample_list["input_ids"][combine_index]
+        sample_list["segment_ids"] = sample_list["segment_ids"][combine_index]
+        sample_list["input_mask"] = sample_list["input_mask"][combine_index]
+        if "attention_mask" in sample_list.keys():
+            sample_list["attention_mask"] = sample_list["attention_mask"][combine_index]
+        sample_list["targets"][combine_index_index] = 0
+
+        return sample_list
+
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
             random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)).cuda())
@@ -185,41 +221,13 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_itm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        input_ids = sample_list["input_ids"]
-        token_type_ids = sample_list["segment_ids"]
-        visual_embeddings = sample_list["image"]
-        visual_embeddings_type = sample_list["visual_embeddings_type"]
-        attention_mask = sample_list["attention_mask"]
-
-        # Hard negative pais mining
-        # FIXME: not support multi-gpu
-        self.eval()
-        with torch.no_grad():
-            itc_dict = self._forward_itc(sample_list)
-            image_embeddings = itc_dict["scores"]
-            text_embeddings = itc_dict["targets"]
-            correlations = image_embeddings @ text_embeddings.t()
-            batch_size = correlations.shape[0]
-            diag = torch.eye(batch_size).bool()
-            correlations[diag] = -1
-            # FIXME: more complicated sampling strategy
-            hard_text_index = torch.argmax(correlations, dim=1)
-            combine_index = torch.arange(batch_size).to(image_embeddings.device)
-            combine_index_index = torch.rand(batch_size) > 0.5
-            combine_index[combine_index_index] = hard_text_index[combine_index_index]
-
-        input_ids = input_ids[combine_index]
-        token_type_ids = token_type_ids[combine_index]
-        attention_mask = attention_mask[combine_index]
-        sample_list["targets"][combine_index_index] = 0
-
-        self.train()
+        sample_list = self.get_hard_pairs(sample_list)
         _, pooled_output, _ = self.bert.get_joint_embedding(
-            input_ids,
-            token_type_ids,
-            visual_embeddings,
-            visual_embeddings_type,
-            attention_mask,
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
         )
         logits = self.heads["itm"](pooled_output)
         reshaped_logits = logits.contiguous().view(-1, 2)
@@ -322,6 +330,36 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_2wpa(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        sample_list = self.get_hard_pairs(sample_list)
+        visual_embeddings, _, _ = self.bert.get_image_embedding(
+            sample_list["image"], sample_list["visual_embeddings_type"]
+        )
+        image_pad = torch.zeros_like(sample_list["visual_embeddings_type"]).bool()
+
+        text_embeddings, _, _ = self.bert.get_text_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["input_mask"],
+        )
+        text_pad = ~sample_list["input_mask"].bool()
+
+        ot_dist = optimal_transport_dist(
+            text_embeddings, visual_embeddings, text_pad, image_pad
+        ).to(text_embeddings.device)
+
+        itm_labels = sample_list["targets"]
+        ot_pos = ot_dist.masked_select(itm_labels == 1)
+        ot_neg = ot_dist.masked_select(itm_labels == 0)
+        ot_loss = (ot_pos.sum() - ot_neg.sum()) / (ot_pos.size(0) + ot_neg.size(0))
+
+        loss = {}
+        loss["2wpa_loss"] = ot_loss
+        output_dict = {}
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
@@ -331,6 +369,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             ouput_dict = self._forward_mpfr(sample_list)
         elif sample_list["task"] == "mpfc":
             ouput_dict = self._forward_mpfc(sample_list)
+        elif sample_list["task"] == "2wpa":
+            ouput_dict = self._forward_2wpa(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 
