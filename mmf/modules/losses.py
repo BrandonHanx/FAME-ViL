@@ -856,10 +856,12 @@ class SupervisedContrastiveLoss(nn.Module):
         mask_similar_class = (
             targets.unsqueeze(-1).eq(all_targets.unsqueeze(0)).to(device).float()
         )  # N x GN
-        mask_anchor_out = torch.ones_like(mask_similar_class)  # N x GN
-        mask_anchor_out[:per_gpu_batch_size, :per_gpu_batch_size] = 1 - torch.eye(
-            per_gpu_batch_size
-        )
+        mask_anchor_out = 1 - torch.eye(all_projections.size(0)).to(device)  # GN x GN
+        rank = get_rank()
+        mask_anchor_out = mask_anchor_out[
+            rank * per_gpu_batch_size : (rank + 1) * per_gpu_batch_size
+        ]  # N x GN
+
         mask_combined = mask_similar_class * mask_anchor_out
         cardinality_per_samples = torch.sum(mask_combined, dim=1)
 

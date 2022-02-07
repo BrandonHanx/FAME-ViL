@@ -39,7 +39,7 @@ model_config:
     image_tokenizer:
       type: vqvae_encoder
       params:
-        pretrained_path: ${env.data_dir}/pretrained_models/vqvae_ema_pp_224_7x7_encoder.pth
+        pretrained_path: ${env.data_dir}/pretrained_models/vqvae_ema_pp_224_7x7_encoder_fashionall.pth
         resolution: 224
         num_tokens: 1024
         codebook_dim: 256
@@ -87,7 +87,7 @@ evaluation:
 
 training:
   experiment_name: fashionvil_e2e_pretrain_mvc
-  batch_size: 4
+  batch_size: 128
   lr_scheduler: true
   max_updates: 120000
   log_interval: 10
@@ -97,7 +97,7 @@ training:
   early_stop:
     criteria: fashionall/r@k_general/avg
     minimize: false
-  # wandb:
-  #   enabled: true
+  wandb:
+    enabled: true
 
 run_type: train_val
