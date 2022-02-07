@@ -27,6 +27,7 @@ class FashionDataset(MMFDataset):
             *args,
             **kwargs,
         )
+        self._double_view = config.get("double_view", False)
 
     def init_processors(self):
         super().init_processors()
@@ -63,12 +64,19 @@ class FashionDataset(MMFDataset):
 
         image_path = sample_info["image_path"]
         if self._dataset_type == "train":
-            image_path = random.choices(image_path)[0]
-            if self._use_images:
-                current_sample.image = self.image_db.from_path(image_path)["images"][0]
-            elif self._use_features:
-                feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
-                current_sample.image = self.features_db.from_path(feature_path)["image_feature_0"]
+            if not self._double_view:
+                image_path = random.choices(image_path)[0]
+                if self._use_images:
+                    current_sample.image = self.image_db.from_path(image_path)["images"][0]
+                elif self._use_features:
+                    feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
+                    current_sample.image = self.features_db.from_path(feature_path)["image_feature_0"]
+            else:
+                # FIXME: don't support features loading under double view mode
+                assert self._use_images
+                image_path_0, image_path_1 = random.choices(image_path, k=2)
+                current_sample.image = self.image_db.from_path(image_path_0)["images"][0]
+                current_sample.dv_image = self.image_db.from_path(image_path_1)["images"][0]
         else:
             if self._use_images:
                 images = self.image_db.from_path(image_path)["images"]

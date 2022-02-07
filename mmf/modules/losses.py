@@ -819,6 +819,62 @@ class ContrastiveLoss(nn.Module):
         return (loss_1 + loss_2) / 2
 
 
+@registry.register_loss("supervised_contrastive_loss")
+class SupervisedContrastiveLoss(nn.Module):
+    """
+    Implementation of the loss described in the paper Supervised Contrastive Learning :
+    https://arxiv.org/abs/2004.11362
+    """
+
+    def __init__(self, temperature: Union[float, Tensor] = 1.0):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
+        projections = model_output["scores"]  # N
+        targets = sample_list["targets"]
+        device = projections.device
+
+        per_gpu_batch_size = projections.size(0)
+
+        all_projections = gather_tensor_along_batch_with_backward(projections)  # GN
+        all_targets = gather_tensor_along_batch_with_backward(targets)
+
+        dot_product_tempered = (
+            torch.mm(projections, all_projections.T) / self.temperature
+        )  # N x GN
+        # Minus max for numerical stability with exponential.
+        # Same done in cross entropy. Epsilon added to avoid log(0)
+        exp_dot_tempered = (
+            torch.exp(
+                dot_product_tempered
+                - torch.max(dot_product_tempered, dim=1, keepdim=True)[0]
+            )
+            + 1e-5
+        )  # N x GN
+
+        mask_similar_class = (
+            targets.unsqueeze(-1).eq(all_targets.unsqueeze(0)).to(device).float()
+        )  # N x GN
+        mask_anchor_out = torch.ones_like(mask_similar_class)  # N x GN
+        mask_anchor_out[:per_gpu_batch_size, :per_gpu_batch_size] = 1 - torch.eye(
+            per_gpu_batch_size
+        )
+        mask_combined = mask_similar_class * mask_anchor_out
+        cardinality_per_samples = torch.sum(mask_combined, dim=1)
+
+        log_prob = -torch.log(
+            exp_dot_tempered
+            / (torch.sum(exp_dot_tempered * mask_anchor_out, dim=1, keepdim=True))
+        )
+        supervised_contrastive_loss_per_sample = (
+            torch.sum(log_prob * mask_combined, dim=1) / cardinality_per_samples
+        )
+        supervised_contrastive_loss = torch.mean(supervised_contrastive_loss_per_sample)
+
+        return supervised_contrastive_loss
+
+
 @registry.register_loss("mse")
 class MSELoss(nn.Module):
     """Mean Squared Error loss"""

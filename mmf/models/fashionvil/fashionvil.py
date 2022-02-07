@@ -21,6 +21,7 @@ class FashionViL(BaseModel):
         super().__init__(config)
         self.config = config
         self.training_head_type = config.training_head_type
+        self.double_view = config.get("double_view", False)
 
     @classmethod
     def config_path(cls):
@@ -30,7 +31,6 @@ class FashionViL(BaseModel):
         self.image_encoder = build_image_encoder(
             self.config.image_encoder, self.config.direct_features_input
         )
-        self.image_tokenizer = None
         if self.training_head_type == "pretraining":
             self.model = FashionViLForPretraining(self.config)
         elif self.training_head_type == "classification":
@@ -80,6 +80,15 @@ class FashionViL(BaseModel):
         if self.training_head_type == "composition":
             sample_list.ref_image = self.image_encoder(sample_list.ref_image)
             sample_list.tar_image = self.image_encoder(sample_list.tar_image)
+        elif self.double_view and self.training:
+            sample_list.original_image = torch.cat(
+                (sample_list.image, sample_list.dv_image), dim=0
+            )
+            sample_list.image_0 = self.image_encoder(sample_list.image)
+            sample_list.image_1 = self.image_encoder(sample_list.dv_image)
+            sample_list.image = torch.cat(
+                (sample_list.image_0, sample_list.image_1), dim=0
+            )
         else:
             if len(sample_list.image.shape) > 4:
                 sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
