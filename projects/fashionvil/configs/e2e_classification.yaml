@@ -1,0 +1,68 @@
+# FashionGen data nums: 60147
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  fashiongen:
+    use_images: true
+    use_features: false
+    category_label: true
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+    lr_multiplier: 20
+    direct_features_input: false
+    bert_model_name: bert-base-uncased
+    training_head_type: classification
+    bypass_transformer: true
+    num_labels: 48
+    losses:
+      - type: cross_entropy
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 43260
+    - 86520
+    lr_ratio: 0.1
+    warmup_iterations: 7210
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 5e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+
+training:
+  experiment_name: fashionvil_classification_fashiongen_e2e
+  batch_size: 32
+  lr_scheduler: true
+  max_updates: 115360
+  log_interval: 10
+  checkpoint_interval: 14420
+  evaluation_interval: 1442
+  early_stop:
+    criteria: fashiongen/accuracy
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val

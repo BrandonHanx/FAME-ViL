@@ -90,9 +90,19 @@ class FashionViL(BaseModel):
                 (sample_list.image_0, sample_list.image_1), dim=0
             )
         else:
-            if len(sample_list.image.shape) > 4:
+            if sample_list.image.dim() > 4:
                 sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
                 sample_list.image_id = torch.flatten(sample_list.image_id, end_dim=-2)
+            if sample_list.input_mask.dim() > 2:
+                sample_list.input_mask = torch.flatten(
+                    sample_list.input_mask, end_dim=-2
+                )
+                sample_list.input_ids = torch.flatten(sample_list.input_ids, end_dim=-2)
+                sample_list.segment_ids = torch.flatten(
+                    sample_list.segment_ids, end_dim=-2
+                )
+            if sample_list.targets.dim() > 1:
+                sample_list.targets = torch.flatten(sample_list.targets)
             sample_list.original_image = sample_list.image
             sample_list.image = self.image_encoder(sample_list.image)
         return self.model(sample_list)

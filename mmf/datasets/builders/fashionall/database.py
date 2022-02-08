@@ -28,6 +28,8 @@ class FashionGenDatabase(torch.utils.data.Dataset):
                     "id": item["id"],
                     "sentences": item["title"] + "." + item["description"],
                     "attributes_id": item["attributes_id"],
+                    "category_id": item["category_id"],
+                    "subcategory_id": item["subcategory_id"],
                 }
             )
 

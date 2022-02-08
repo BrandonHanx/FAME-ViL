@@ -29,6 +29,8 @@ class FashionDataset(MMFDataset):
         )
         self._double_view = config.get("double_view", False)
         self._attribute_label = config.get("attribute_label", False)
+        self._category_label = config.get("category_label", False)
+        self._subcategory_label = config.get("subcategory_label", False)
 
     def init_processors(self):
         super().init_processors()
@@ -83,6 +85,12 @@ class FashionDataset(MMFDataset):
                 if len(sample_info["attributes_id"]) > 0:
                     attribute_labels[sample_info["attributes_id"]] = 1 / len(sample_info["attributes_id"])
                 current_sample.attribute_labels = attribute_labels
+            if self._category_label:
+                current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long)
+            elif self._subcategory_label:
+                current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
+            else:
+                current_sample.targets = torch.tensor(1, dtype=torch.long)
         else:
             if self._use_images:
                 images = self.image_db.from_path(image_path)["images"]
@@ -99,8 +107,20 @@ class FashionDataset(MMFDataset):
             current_sample.text_id = torch.tensor(sample_info["id"], dtype=torch.long)
             current_sample.image_id = current_sample.text_id.repeat(len(image_path), 1)
 
+            if self._category_label:
+                current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long).repeat(len(image_path))
+                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
+                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
+                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+            elif self._subcategory_label:
+                current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long).repeat(len(image_path))
+                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
+                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
+                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+            else:
+                current_sample.targets = torch.tensor(1, dtype=torch.long)
+
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
-        current_sample.targets = torch.tensor(1, dtype=torch.long)
 
         if hasattr(self, "masked_image_processor"):
             current_sample.image_masks = self.masked_image_processor(current_sample.image)
