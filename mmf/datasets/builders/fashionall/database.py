@@ -21,15 +21,13 @@ class FashionGenDatabase(torch.utils.data.Dataset):
         with PathManager.open(splits_path, "r") as f:
             annotations_json = json.load(f)
 
-        pairs = annotations_json["pairs"]
-        descriptions = annotations_json["descriptions"]
-
-        for item in pairs:
+        for item in annotations_json:
             data.append(
                 {
-                    "image_path": item["image"],
+                    "image_path": [item["images"]],
                     "id": item["id"],
-                    "sentences": descriptions[str(item["id"])],
+                    "sentences": item["title"] + "." + item["description"],
+                    "attributes_id": item["attributes_id"],
                 }
             )
 
@@ -68,6 +66,7 @@ class BigFACADDatabase(torch.utils.data.Dataset):
                     "image_path": item["images"],
                     "id": item["id"],
                     "sentences": item["color"] + "." + item["title"] + "." + item["description"],
+                    "attributes_id": item["attributes_id"],
                 }
             )
 
@@ -106,6 +105,7 @@ class Fashion200kDatabase(torch.utils.data.Dataset):
                     "image_path": item["images"],
                     "id": item["id"],
                     "sentences": item["title"],
+                    "attributes_id": item["attributes_id"],
                 }
             )
 
@@ -144,6 +144,7 @@ class PolyvoreOutfitsDatabase(torch.utils.data.Dataset):
                     "image_path": [item["images"]],
                     "id": item["id"],
                     "sentences": item["title"] + "." + item["description"],
+                    "attributes_id": item["attributes_id"],
                 }
             )
 

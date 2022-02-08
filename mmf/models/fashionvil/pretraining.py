@@ -12,6 +12,7 @@ from mmf.modules.losses import (
     CrossEntropyLoss,
     MSELoss,
     SupervisedContrastiveLoss,
+    SoftLabelCrossEntropyLoss,
 )
 from mmf.modules.ot import optimal_transport_dist
 from mmf.utils.build import build_image_encoder
@@ -91,6 +92,14 @@ class FashionViLForPretraining(FashionViLBaseModel):
                     1024,
                 ),
             )
+        if "pac" in self.tasks:
+            self.heads["pac"] = nn.Sequential(
+                BertPredictionHeadTransform(self.bert.config),
+                nn.Linear(
+                    self.bert.config.hidden_size,
+                    2232,
+                ),
+            )
 
     def init_losses(self):
         self.loss_funcs["itc"] = ContrastiveLoss()
@@ -104,6 +113,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["mpfc"] = CrossEntropyLoss()
         if "mvc" in self.tasks:
             self.loss_funcs["mvc"] = SupervisedContrastiveLoss()
+        if "pac" in self.tasks:
+            self.loss_funcs["pac"] = SoftLabelCrossEntropyLoss()
 
     @torch.no_grad()
     def get_patch_labels(self, image, chunk_size=8):
@@ -217,7 +228,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 dim=-1,
             )
 
-        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc"]:
+        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc", "pac"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -448,6 +459,24 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_pac(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        _, pooled_output, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
+        )
+        logits = self.heads["pac"](pooled_output)
+        output_dict = {"scores": logits}
+        sample_list.targets = sample_list.attribute_labels
+
+        loss = {}
+        loss["pac_loss"] = self.loss_funcs["pac"](sample_list, output_dict)
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
@@ -461,6 +490,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             ouput_dict = self._forward_2wpa(sample_list)
         elif sample_list["task"] == "mvc":
             ouput_dict = self._forward_mvc(sample_list)
+        elif sample_list["task"] == "pac":
+            ouput_dict = self._forward_pac(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 

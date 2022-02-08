@@ -28,6 +28,7 @@ class FashionDataset(MMFDataset):
             **kwargs,
         )
         self._double_view = config.get("double_view", False)
+        self._attribute_label = config.get("attribute_label", False)
 
     def init_processors(self):
         super().init_processors()
@@ -77,6 +78,11 @@ class FashionDataset(MMFDataset):
                 image_path_0, image_path_1 = random.choices(image_path, k=2)
                 current_sample.image = self.image_db.from_path(image_path_0)["images"][0]
                 current_sample.dv_image = self.image_db.from_path(image_path_1)["images"][0]
+            if self._attribute_label:
+                attribute_labels = torch.zeros(2232)
+                if len(sample_info["attributes_id"]) > 0:
+                    attribute_labels[sample_info["attributes_id"]] = 1 / len(sample_info["attributes_id"])
+                current_sample.attribute_labels = attribute_labels
         else:
             if self._use_images:
                 images = self.image_db.from_path(image_path)["images"]
