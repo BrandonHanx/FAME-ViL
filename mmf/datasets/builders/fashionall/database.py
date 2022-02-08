@@ -24,7 +24,7 @@ class FashionGenDatabase(torch.utils.data.Dataset):
         for item in annotations_json:
             data.append(
                 {
-                    "image_path": [item["images"]],
+                    "image_path": item["images"],
                     "id": item["id"],
                     "sentences": item["title"] + "." + item["description"],
                     "attributes_id": item["attributes_id"],
