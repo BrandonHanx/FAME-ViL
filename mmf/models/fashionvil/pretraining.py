@@ -17,6 +17,7 @@ from mmf.modules.ot import optimal_transport_dist
 from mmf.utils.build import build_image_encoder
 from mmf.utils.configuration import get_mmf_cache_dir
 from mmf.utils.distributed import broadcast_tensor
+from numpy.random import choice
 from torch import Tensor, nn
 from transformers.modeling_bert import (
     BertOnlyNSPHead,
@@ -30,6 +31,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         super().__init__(config)
         self.task_for_inference = config.task_for_inference
         self.tasks = config.tasks
+        self.tasks_sample_ratio = config.get("tasks_sample_ratio", None)
         self.double_view = config.get("double_view", False)
 
         self.contrastive_norm = NormalizationLayer()
@@ -160,7 +162,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if self.training:
-            random_idx = broadcast_tensor(torch.randint(len(self.tasks), (1,)).cuda())
+            random_idx = choice(len(self.tasks), p=self.tasks_sample_ratio)
+            random_idx = broadcast_tensor(torch.tensor(random_idx).cuda())
             sample_list["task"] = self.tasks[random_idx.item()]
         else:
             sample_list["task"] = self.task_for_inference
