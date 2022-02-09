@@ -22,15 +22,25 @@ class FashionViL(BaseModel):
         self.config = config
         self.training_head_type = config.training_head_type
         self.double_view = config.get("double_view", False)
+        self.freeze_image_encoder = config.get("freeze_image_encoder", False)
 
     @classmethod
     def config_path(cls):
         return "configs/models/fashionvil/defaults.yaml"
 
+    def train(self, mode=True):
+        super().train(mode)
+        if self.freeze_image_encoder:
+            self.image_encoder.eval()
+
     def build(self):
         self.image_encoder = build_image_encoder(
             self.config.image_encoder, self.config.direct_features_input
         )
+        if self.freeze_image_encoder:
+            self.image_encoder = self.image_encoder.eval()
+            for param in self.image_encoder.parameters():
+                param.requires_grad = False
         if self.training_head_type == "pretraining":
             self.model = FashionViLForPretraining(self.config)
         elif self.training_head_type == "classification":

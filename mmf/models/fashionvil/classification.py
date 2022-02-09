@@ -5,13 +5,17 @@ from typing import Dict
 import torch
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from torch import Tensor, nn
+from transformers.modeling_bert import BertPredictionHeadTransform
 
 
 class FashionViLForClassification(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.classifier = nn.Linear(self.bert.config.hidden_size, config.num_labels)
+        self.classifier = nn.Sequential(
+            BertPredictionHeadTransform(self.bert.config),
+            nn.Linear(self.bert.config.hidden_size, config.num_labels),
+        )
 
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
