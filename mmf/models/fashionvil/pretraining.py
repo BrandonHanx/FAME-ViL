@@ -17,8 +17,6 @@ from mmf.modules.losses import (
 from mmf.modules.ot import optimal_transport_dist
 from mmf.utils.build import build_image_encoder
 from mmf.utils.configuration import get_mmf_cache_dir
-from mmf.utils.distributed import broadcast_tensor
-from numpy.random import choice
 from torch import Tensor, nn
 from transformers.modeling_bert import (
     BertOnlyNSPHead,
@@ -32,7 +30,6 @@ class FashionViLForPretraining(FashionViLBaseModel):
         super().__init__(config)
         self.task_for_inference = config.task_for_inference
         self.tasks = config.tasks
-        self.tasks_sample_ratio = config.get("tasks_sample_ratio", None)
         self.double_view = config.get("double_view", False)
 
         self.contrastive_norm = NormalizationLayer()
@@ -115,6 +112,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             self.loss_funcs["mvc"] = SupervisedContrastiveLoss()
         if "pac" in self.tasks:
             self.loss_funcs["pac"] = SoftLabelCrossEntropyLoss()
+        if "icc" in self.tasks:
+            self.loss_funcs["icc"] = ContrastiveLoss()
 
     @torch.no_grad()
     def get_patch_labels(self, image, chunk_size=8):
@@ -171,15 +170,6 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return sample_list
 
-    def add_custom_params(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        if self.training:
-            random_idx = choice(len(self.tasks), p=self.tasks_sample_ratio)
-            random_idx = broadcast_tensor(torch.tensor(random_idx).cuda())
-            sample_list["task"] = self.tasks[random_idx.item()]
-        else:
-            sample_list["task"] = self.task_for_inference
-        return sample_list
-
     def flatten_for_bert(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "segment_ids"]
         to_be_flattened_dim = ["image"]
@@ -228,7 +218,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 dim=-1,
             )
 
-        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc", "pac"]:
+        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc", "pac", "icc"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -477,6 +467,35 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         return output_dict
 
+    def _forward_icc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        visual_embeddings, _, _ = self.bert.get_image_embedding(
+            sample_list["image"], sample_list["visual_embeddings_type"]
+        )
+        visual_embeddings = visual_embeddings.mean(dim=1)
+        visual_embeddings = self.contrastive_norm(visual_embeddings)
+
+        comp_embeddings, _, _ = self.bert.get_joint_embedding(
+            sample_list["input_ids"],
+            sample_list["segment_ids"],
+            sample_list["dv_image"],
+            sample_list["visual_embeddings_type"],
+            sample_list["attention_mask"],
+        )
+        num_visual_tokens = sample_list["dv_image"].shape[1]
+        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        comp_embeddings = self.contrastive_norm(comp_embeddings)
+
+        output_dict = {
+            "scores": visual_embeddings,
+            "targets": comp_embeddings,
+        }
+
+        loss = {}
+        loss["icc_loss"] = self.loss_funcs["icc"](sample_list, output_dict)
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list["task"] == "itm":
             ouput_dict = self._forward_itm(sample_list)
@@ -492,6 +511,8 @@ class FashionViLForPretraining(FashionViLBaseModel):
             ouput_dict = self._forward_mvc(sample_list)
         elif sample_list["task"] == "pac":
             ouput_dict = self._forward_pac(sample_list)
+        elif sample_list["task"] == "icc":
+            ouput_dict = self._forward_icc(sample_list)
         else:
             ouput_dict = self._forward_itc(sample_list)
 

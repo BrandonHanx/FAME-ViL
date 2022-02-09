@@ -10,8 +10,10 @@ from mmf.models.fashionvil.composition import FashionViLForComposition
 from mmf.models.fashionvil.contrastive import FashionViLForContrastive
 from mmf.models.fashionvil.pretraining import FashionViLForPretraining
 from mmf.utils.build import build_image_encoder
+from mmf.utils.distributed import broadcast_tensor
 from mmf.utils.general import filter_grads
 from mmf.utils.modeling import get_fashionvil_configured_parameters
+from numpy.random import choice
 from torch import Tensor
 
 
@@ -21,8 +23,14 @@ class FashionViL(BaseModel):
         super().__init__(config)
         self.config = config
         self.training_head_type = config.training_head_type
+
         self.double_view = config.get("double_view", False)
         self.freeze_image_encoder = config.get("freeze_image_encoder", False)
+
+        if self.training_head_type == "pretraining":
+            self.task_for_inference = config.task_for_inference
+            self.tasks = config.tasks
+            self.tasks_sample_ratio = config.get("tasks_sample_ratio", None)
 
     @classmethod
     def config_path(cls):
@@ -87,18 +95,26 @@ class FashionViL(BaseModel):
         return image_encoder_params + bert_params
 
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.training_head_type == "pretraining":
+            if self.training:
+                random_idx = choice(len(self.tasks), p=self.tasks_sample_ratio)
+                random_idx = broadcast_tensor(torch.tensor(random_idx).cuda())
+                sample_list.task = self.tasks[random_idx.item()]
+            else:
+                sample_list.task = self.task_for_inference
+
         if self.training_head_type == "composition":
             sample_list.ref_image = self.image_encoder(sample_list.ref_image)
             sample_list.tar_image = self.image_encoder(sample_list.tar_image)
-        elif self.double_view and self.training:
-            sample_list.original_image = torch.cat(
-                (sample_list.image, sample_list.dv_image), dim=0
-            )
-            sample_list.image_0 = self.image_encoder(sample_list.image)
-            sample_list.image_1 = self.image_encoder(sample_list.dv_image)
-            sample_list.image = torch.cat(
-                (sample_list.image_0, sample_list.image_1), dim=0
-            )
+        # elif self.double_view and self.training:
+        #     sample_list.original_image = torch.cat(
+        #         (sample_list.image, sample_list.dv_image), dim=0
+        #     )
+        #     sample_list.image_0 = self.image_encoder(sample_list.image)
+        #     sample_list.image_1 = self.image_encoder(sample_list.dv_image)
+        #     sample_list.image = torch.cat(
+        #         (sample_list.image_0, sample_list.image_1), dim=0
+        #     )
         else:
             if sample_list.image.dim() > 4:
                 sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
@@ -115,4 +131,8 @@ class FashionViL(BaseModel):
                 sample_list.targets = torch.flatten(sample_list.targets)
             sample_list.original_image = sample_list.image
             sample_list.image = self.image_encoder(sample_list.image)
+
+        if self.training_head_type == "pretraining" and sample_list.task == "icc":
+            sample_list.dv_image = self.image_encoder(sample_list.dv_image)
+
         return self.model(sample_list)
