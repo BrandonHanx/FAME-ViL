@@ -476,9 +476,17 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         num_visual_tokens = sample_list["dv_image"].shape[1]
         num_text_tokens = sample_list["input_ids"].shape[1]
-        pacth_dropout_index = (
-            torch.randint(high=num_visual_tokens, size=(12,)) + num_text_tokens
+        dropout_ratio = 0.25
+        text_dropout_index = torch.randint(
+            high=num_text_tokens, size=(int(dropout_ratio * num_text_tokens),)
         )
+        pacth_dropout_index = (
+            torch.randint(
+                high=num_visual_tokens, size=(int(dropout_ratio * num_visual_tokens),)
+            )
+            + num_text_tokens
+        )
+        sample_list["attention_mask"][:, text_dropout_index] = 0
         sample_list["attention_mask"][:, pacth_dropout_index] = 0
         comp_embeddings, _, _ = self.bert.get_joint_embedding(
             sample_list["input_ids"],
@@ -489,7 +497,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         )
         comp_embeddings[:, pacth_dropout_index] = 0
         comp_embeddings = comp_embeddings[:, -num_visual_tokens:].sum(dim=1) / (
-            num_visual_tokens - 12
+            num_visual_tokens - int(dropout_ratio * num_visual_tokens)
         )
         comp_embeddings = self.contrastive_norm(comp_embeddings)
 
