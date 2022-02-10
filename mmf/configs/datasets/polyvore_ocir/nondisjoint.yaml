@@ -1,0 +1,46 @@
+dataset_config:
+  polyvore_ocir:
+      data_dir: ${env.data_dir}/datasets
+      use_images: true
+      images:
+        train:
+        - PolyvoreOutfits/images
+        val:
+        - PolyvoreOutfits/images
+        test:
+        - PolyvoreOutfits/images
+      annotations:
+        train:
+        - PolyvoreOutfits/ocir_nondisjoint_train.json
+        val:
+        - PolyvoreOutfits/ocir_nondisjoint_test.json
+        test:
+        - PolyvoreOutfits/ocir_nondisjoint_test.json
+      processors:
+        train_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: RandomResizedCrop
+                params:
+                  size: [224, 224]
+                  scale: [0.8, 1.0]
+                  ratio: [0.75, 1.3]
+              - RandomHorizontalFlip
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]
+        eval_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: Resize
+                params:
+                  size: [224, 224]
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]

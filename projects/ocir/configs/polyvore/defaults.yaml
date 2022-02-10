@@ -1,0 +1,41 @@
+# PolyVore OCIR data nums: 16995
+
+includes:
+- configs/models/csa_net/defaults.yaml
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 7950
+    - 13250
+    lr_ratio: 0.1
+    warmup_iterations: 2650
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 5e-5
+    eps: 1e-8
+
+evaluation:
+  metrics:
+  - r@k_ocir
+
+training:
+  experiment_name: polyvore_csa_disjoint
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 18550
+  log_interval: 10
+  checkpoint_interval: 1325
+  evaluation_interval: 600
+  early_stop:
+    criteria: polyvore_ocir/r@k_ocir/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val

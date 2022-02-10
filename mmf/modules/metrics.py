@@ -1323,6 +1323,121 @@ class RecallAtK_general(BaseMetric):
         return dict(zip(keys, values))
 
 
+@registry.register_metric("r@k_ocir")
+class RecallAtK_ocir(BaseMetric):
+    def __init__(self, name="recall@k_ocir"):
+        super().__init__(name)
+        self.required_params = [
+            "scores",
+            "targets",
+            "blank_id",
+            "blank_cat_id",
+            "fake_data",
+        ]
+
+    def _get_rk(
+        self,
+        q_ids: Tensor,
+        g_ids: Tensor,
+        comp_embeddings: Tensor,
+        tar_embeddings: Tensor,
+        similarity_mask: Tensor,
+        k: int,
+    ):
+        # acclerate sort with topk
+        similarity = comp_embeddings @ tar_embeddings.t()
+        similarity[similarity_mask] = -1
+        max_sim, indices = torch.topk(
+            similarity, k=k, dim=1, largest=True, sorted=True
+        )  # q * k
+        pred_labels = g_ids[indices]  # q * k
+        matches = pred_labels.eq(q_ids.view(-1, 1))  # q * k
+
+        all_cmc = matches[:, :k].cumsum(1)
+        all_cmc[all_cmc > 1] = 1
+        all_cmc = all_cmc.float().mean(0)
+        ratk = all_cmc[k - 1]
+        return ratk
+
+    def _calculate(
+        self,
+        comp_embeddings: Tensor,
+        tar_embeddings: Tensor,
+        target_ids: Tensor,
+        target_class: Tensor,
+        fake_data: Tensor,
+        k: int,
+    ):
+        comp_embeddings = comp_embeddings[~fake_data]
+        q_ids = target_ids[~fake_data]
+
+        _, unique_idx = np.unique(target_ids.cpu().numpy(), return_index=True)
+        unique_idx = torch.tensor(unique_idx, device=comp_embeddings.device)
+
+        tar_embeddings = tar_embeddings[unique_idx]
+        g_ids = target_ids[unique_idx]
+
+        q_cls = target_class[~fake_data]
+        g_cls = target_class[unique_idx]
+        mask = q_cls.unsqueeze(-1).ne(g_cls.unsqueeze(0))
+
+        return self._get_rk(
+            q_ids.cpu(),
+            g_ids.cpu(),
+            comp_embeddings.cpu(),
+            tar_embeddings.cpu(),
+            mask.cpu(),
+            k,
+        )
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        comp_embeddings = model_output["scores"]
+        tar_embeddings = model_output["targets"]
+        target_ids = sample_list["blank_id"]
+        target_class = sample_list["blank_cat_id"]
+        fake_data = sample_list["fake_data"]
+
+        keys = [
+            "r@10",
+            "r@30",
+            "r@50",
+            "avg",
+        ]
+        values = torch.zeros(4, device=comp_embeddings.device)
+        values[0] = self._calculate(
+            comp_embeddings,
+            tar_embeddings,
+            target_ids,
+            target_class,
+            fake_data,
+            10,
+        )
+        values[1] = self._calculate(
+            comp_embeddings,
+            tar_embeddings,
+            target_ids,
+            target_class,
+            fake_data,
+            30,
+        )
+        values[2] = self._calculate(
+            comp_embeddings,
+            tar_embeddings,
+            target_ids,
+            target_class,
+            fake_data,
+            50,
+        )
+        values[3] = torch.mean(values[:-1])
+        return dict(zip(keys, values))
+
+
 @registry.register_metric("r@k_fashioniq")
 class RecallAtK_fashioniq(BaseMetric):
     """

@@ -1,7 +1,6 @@
 import os
 import json
 
-import pandas as pd
 import torch
 from mmf.utils.file_io import PathManager
 
