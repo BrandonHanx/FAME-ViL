@@ -9,6 +9,7 @@ from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
 from mmf.models.composition import NormalizationLayer
 from mmf.utils.build import build_image_encoder
+from mmf.utils.general import filter_grads
 from omegaconf import MISSING
 from torch.nn.functional import one_hot
 
@@ -61,7 +62,24 @@ class CSANet(BaseModel):
             self.config.n_categories * 2,
             self.config.feature_dim,
         )
-        self.norm_layer = NormalizationLayer()
+        self.norm_layer = NormalizationLayer(normalize_scale=4.0)
+
+    def get_optimizer_parameters(self, config):
+        base_lr = config.optimizer.params.lr
+        backbone_params = [
+            {
+                "params": filter_grads(self.image_encoder.parameters()),
+                "lr": base_lr * 1,
+            }
+        ]
+        rest_params = [
+            {"params": filter_grads(self.proj_layer.parameters()), "lr": base_lr},
+            {"params": filter_grads(self.fusion_module.parameters()), "lr": base_lr},
+            {"params": filter_grads(self.norm_layer.parameters()), "lr": base_lr},
+        ]
+        training_parameters = backbone_params + rest_params
+
+        return training_parameters
 
     def forward(self, sample_list):
         if sample_list.question_image.dim() > 4:

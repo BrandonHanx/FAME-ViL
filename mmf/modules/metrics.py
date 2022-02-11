@@ -1341,11 +1341,13 @@ class RecallAtK_ocir(BaseMetric):
         g_ids: Tensor,
         comp_embeddings: Tensor,
         tar_embeddings: Tensor,
-        similarity_mask: Tensor,
+        q_cls: Tensor,
+        g_cls: Tensor,
         k: int,
     ):
         # acclerate sort with topk
         similarity = comp_embeddings @ tar_embeddings.t()
+        similarity_mask = q_cls.unsqueeze(-1).ne(g_cls.unsqueeze(0))
         similarity[similarity_mask] = -1
         max_sim, indices = torch.topk(
             similarity, k=k, dim=1, largest=True, sorted=True
@@ -1355,7 +1357,14 @@ class RecallAtK_ocir(BaseMetric):
 
         all_cmc = matches[:, :k].cumsum(1)
         all_cmc[all_cmc > 1] = 1
-        all_cmc = all_cmc.float().mean(0)
+        all_cmc = all_cmc.float()
+
+        q_cls_freq = torch.bincount(q_cls)
+        q_cls_weight = 1 / q_cls_freq
+        weight = q_cls_weight[q_cls].unsqueeze(-1)
+        all_cmc = all_cmc * weight
+        all_cmc = all_cmc.sum(0) / len(torch.unique(q_cls))
+
         ratk = all_cmc[k - 1]
         return ratk
 
@@ -1379,14 +1388,14 @@ class RecallAtK_ocir(BaseMetric):
 
         q_cls = target_class[~fake_data]
         g_cls = target_class[unique_idx]
-        mask = q_cls.unsqueeze(-1).ne(g_cls.unsqueeze(0))
 
         return self._get_rk(
             q_ids.cpu(),
             g_ids.cpu(),
             comp_embeddings.cpu(),
             tar_embeddings.cpu(),
-            mask.cpu(),
+            q_cls.cpu(),
+            g_cls.cpu(),
             k,
         )
 

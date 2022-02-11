@@ -8,7 +8,7 @@ model_config:
     image_encoder:
       type: torchvision_resnet
       params:
-        name: resnet18
+        name: resnet50
         pretrained: true
         zero_init_residual: false
         num_output_features: 1

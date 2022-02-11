@@ -3,22 +3,33 @@
 includes:
 - configs/models/csa_net/defaults.yaml
 
+csa_net:
+  image_channel: 512
+  n_categories: 153
+  n_conditions: 5
+  feature_dim: 64
+
+  image_encoder:
+    type: torchvision_resnet
+    params:
+      name: resnet50
+      pretrained: true
+      zero_init_residual: false
+      num_output_features: 1
+      pool_type: avg
+
 scheduler:
-  type: multi_step
+  type: warmup_linear
   params:
-    use_warmup: true
-    lr_steps:
-    - 7950
-    - 13250
-    lr_ratio: 0.1
-    warmup_iterations: 2650
-    warmup_factor: 0.25
+    num_warmup_steps: 0
+    num_training_steps: ${training.max_updates}
 
 optimizer:
   type: adam_w
   params:
     lr: 5e-5
     eps: 1e-8
+    weight_decay: 1e-4
 
 evaluation:
   metrics:
@@ -28,10 +39,10 @@ training:
   experiment_name: polyvore_csa_disjoint
   batch_size: 64
   lr_scheduler: true
-  max_updates: 18550
+  max_updates: 4000
   log_interval: 10
-  checkpoint_interval: 1325
-  evaluation_interval: 600
+  checkpoint_interval: 4000
+  evaluation_interval: 1000
   early_stop:
     criteria: polyvore_ocir/r@k_ocir/avg
     minimize: false
