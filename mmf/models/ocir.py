@@ -62,7 +62,7 @@ class CSANet(BaseModel):
             self.config.n_categories * 2,
             self.config.feature_dim,
         )
-        self.norm_layer = NormalizationLayer(normalize_scale=4.0)
+        self.norm_layer = NormalizationLayer(normalize_scale=1.0, learn_scale=False)
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
@@ -107,7 +107,11 @@ class CSANet(BaseModel):
         question_feat = self.proj_layer(question_feat)
         question_feat = self.fusion_module(question_feat, twohot)
         question_feat = self.norm_layer(question_feat)
-        if not self.training:
+        if self.training:
+            negative_feat = self.image_encoder(sample_list.negative_image).squeeze()
+            negative_feat = self.proj_layer(negative_feat)
+            negative_feat = self.norm_layer(negative_feat)
+        else:
             diff_idx = torch.diff(sample_list.ann_idx)
             feat_pool = []
             feat = question_feat[0]
@@ -130,6 +134,7 @@ class CSANet(BaseModel):
         output = {
             "scores": question_feat,
             "targets": blank_feat,
+            "negative": negative_feat if self.training else None,
         }
 
         return output

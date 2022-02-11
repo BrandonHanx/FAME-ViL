@@ -8,11 +8,13 @@ model_config:
     image_encoder:
       type: torchvision_resnet
       params:
-        name: resnet50
+        name: resnet18
         pretrained: true
         zero_init_residual: false
         num_output_features: 1
         pool_type: avg
 
     losses:
-    - type: contrastive_loss
+    - type: triplet_loss
+      params:
+        margin: 0.3

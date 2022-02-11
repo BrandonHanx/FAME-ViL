@@ -48,6 +48,7 @@ class PolyvoreOCIRDataset(MMFDataset):
         current_sample.question_cat_id = torch.tensor(sample_info["question_cat_id"], dtype=torch.long)
         if self._dataset_type == "train":
             current_sample.question_image = self.image_db.from_path(sample_info["question_path"])["images"][0]
+            current_sample.negative_image = self.image_db.from_path(sample_info["negative_path"])["images"][0]
             current_sample.combine_cat_id = torch.tensor(
                 [sample_info["question_cat_id"], sample_info["blank_cat_id"]],
                 dtype=torch.long

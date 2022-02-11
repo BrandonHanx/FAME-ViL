@@ -756,6 +756,31 @@ class InBatchHinge(nn.Module):
         return loss
 
 
+@registry.register_loss("triplet_loss")
+class TripletLoss(nn.Module):
+    """
+    Based on the code from https://github.com/fartashf/vsepp/blob/master/model.py
+    """
+
+    def __init__(self, margin: float = 0.2):
+        super().__init__()
+        self.margin = margin
+
+    def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
+        if not self.training:
+            return torch.tensor(0.0, device=model_output["scores"].device)
+
+        anchor = model_output["scores"]
+        positive = model_output["targets"]
+        negative = model_output["negative"]
+
+        loss = F.triplet_margin_loss(
+            anchor, positive, negative, margin=self.margin, p=2
+        )
+
+        return loss
+
+
 @registry.register_loss("bbc_loss")
 class BatchBasedClassificationLoss(nn.Module):
     def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
