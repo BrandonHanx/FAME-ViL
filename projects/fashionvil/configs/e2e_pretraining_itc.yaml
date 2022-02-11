@@ -1,0 +1,81 @@
+# Total data nums:
+# BigFACAD: 164555
+# FashionGen: 60147
+# Fashion200k: 76856
+# PolyvoreOutfits: 71967
+# Total: 373408
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  fashionall:
+    processors:
+        masked_token_processor:
+          type: fashionvil_text_tokenizer
+          params:
+            tokenizer_config:
+              type: bert-base-uncased
+              params:
+                do_lower_case: true
+            mask_probability: 0.15
+            max_seq_length: 75
+            do_whole_word_mask: false
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+    direct_features_input: false
+    bypass_transformer: true
+    bert_model_name: bert-base-uncased
+    training_head_type: pretraining
+    task_for_inference: itc
+    lr_multiplier: 20
+    tasks:
+      - itc
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 11250
+    - 22500
+    lr_ratio: 0.1
+    warmup_iterations: 3750
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+  - type: r@k_general
+
+training:
+  experiment_name: fashionvil_e2e_pretrain_itc
+  batch_size: 256
+  lr_scheduler: true
+  max_updates: 30000
+  log_interval: 10
+  checkpoint_interval: 15000
+  evaluation_interval: 1500
+  find_unused_parameters: true
+  early_stop:
+    criteria: fashionall/r@k_general/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
