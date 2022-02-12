@@ -196,8 +196,9 @@ class PolyvoreOCIRDatabase(torch.utils.data.Dataset):
             negative_pool = {k: list(set(v)) for k, v in negative_pool.items()}
 
             for item in annotations_json:
-                question_id = random.choices(item["question"])[0]
-                blank_id = item["blank"]
+                question_id, blank_id = random.choices(item["question"] + [item["blank"]], k=2)
+                # question_id = random.choices(item["question"])[0]
+                # blank_id = item["blank"]
                 question_cat_id = meta[question_id]["category_id"]
                 blank_cat_id = meta[blank_id]["category_id"]
                 data.append(

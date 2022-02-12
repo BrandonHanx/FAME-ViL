@@ -69,7 +69,7 @@ class CSANet(BaseModel):
         backbone_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * 1,
+                "lr": base_lr * 0.1,
             }
         ]
         rest_params = [
@@ -108,9 +108,10 @@ class CSANet(BaseModel):
         question_feat = self.fusion_module(question_feat, twohot)
         question_feat = self.norm_layer(question_feat)
         if self.training:
-            negative_feat = self.image_encoder(sample_list.negative_image).squeeze()
-            negative_feat = self.proj_layer(negative_feat)
-            negative_feat = self.norm_layer(negative_feat)
+            pass
+        #     negative_feat = self.image_encoder(sample_list.negative_image).squeeze()
+        #     negative_feat = self.proj_layer(negative_feat)
+        #     negative_feat = self.norm_layer(negative_feat)
         else:
             diff_idx = torch.diff(sample_list.ann_idx)
             feat_pool = []
@@ -134,7 +135,7 @@ class CSANet(BaseModel):
         output = {
             "scores": question_feat,
             "targets": blank_feat,
-            "negative": negative_feat if self.training else None,
+            # "negative": negative_feat if self.training else None,
         }
 
         return output
