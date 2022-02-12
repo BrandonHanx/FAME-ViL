@@ -12,7 +12,7 @@ model_config:
     image_channel: 2048
     n_categories: 153
     n_conditions: 5
-    feature_dim: 64
+    feature_dim: 256
 
     image_encoder:
       type: torchvision_resnet
@@ -24,25 +24,30 @@ model_config:
         pool_type: avg
 
 scheduler:
-  type: warmup_linear
+  type: multi_step
   params:
-    num_warmup_steps: 0
-    num_training_steps: ${training.max_updates}
+    use_warmup: true
+    lr_steps:
+    - 3000
+    - 5000
+    lr_ratio: 0.1
+    warmup_iterations: 1000
+    warmup_factor: 0.25
 
 optimizer:
-  type: Adam
+  type: adam_w
   params:
-    lr: 5e-5
+    lr: 1e-4
     eps: 1e-8
-    weight_decay: 1e-4
+    weight_decay: 1e-3
 
 evaluation:
   metrics:
   - r@k_ocir
 
 training:
-  experiment_name: polyvore_csa_disjoint
-  batch_size: 32
+  experiment_name: polyvore_csa_disjoint_tune
+  batch_size: 64
   lr_scheduler: true
   max_updates: 8000
   log_interval: 10
