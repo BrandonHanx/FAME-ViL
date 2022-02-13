@@ -28,7 +28,7 @@ scheduler:
   params:
     use_warmup: true
     lr_steps:
-    - 3000
+    - 1500
     - 5000
     lr_ratio: 0.1
     warmup_iterations: 1000
@@ -39,14 +39,14 @@ optimizer:
   params:
     lr: 1e-4
     eps: 1e-8
-    weight_decay: 1e-3
+    # weight_decay: 1e-3
 
 evaluation:
   metrics:
   - r@k_ocir
 
 training:
-  experiment_name: polyvore_csa_disjoint_tune
+  experiment_name: polyvore_csa_disjoint_icc_pac
   batch_size: 64
   lr_scheduler: true
   max_updates: 8000
@@ -63,6 +63,6 @@ run_type: train_val
 
 checkpoint:
   resume_pretrained: true
-  resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
+  resume_file: save/fashionvil_e2e_pretrain_icc_pac/best.ckpt
   pretrained_state_mapping:
     image_encoder: image_encoder

@@ -54,22 +54,42 @@ class CSANet(BaseModel):
     def config_path(cls):
         return "configs/models/csa_net/defaults.yaml"
 
+    @staticmethod
+    def set_bn_eval(module):
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            module.eval()
+
+    @staticmethod
+    def set_bn_no_grad(module):
+        if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            for p in module.parameters():
+                p.requires_grad = False
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.image_encoder.apply(self.set_bn_eval)
+
     def build(self):
         self.image_encoder = build_image_encoder(self.config.image_encoder)
+        # Set block fixed
+        for p in self.image_encoder.model[-1].parameters():
+            p.requires_grad = False
+        self.image_encoder.apply(self.set_bn_eval)
+        self.image_encoder.apply(self.set_bn_no_grad)
         self.proj_layer = nn.Linear(self.config.image_channel, self.config.feature_dim)
         self.fusion_module = CSAFusion(
             self.config.n_conditions,
             self.config.n_categories * 2,
             self.config.feature_dim,
         )
-        self.norm_layer = NormalizationLayer(normalize_scale=1.0, learn_scale=False)
+        self.norm_layer = NormalizationLayer(normalize_scale=4.0, learn_scale=True)
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
         backbone_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * 0.1,
+                "lr": base_lr * 1,
             }
         ]
         rest_params = [
