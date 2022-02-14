@@ -10,10 +10,7 @@ includes:
 
 dataset_config:
   fashionall:
-    attribute_label: true
     processors:
-        masked_image_processor:
-          type: blockwise_masked_patch
         masked_token_processor:
           type: fashionvil_text_tokenizer
           params:
@@ -23,7 +20,7 @@ dataset_config:
                 do_lower_case: true
             mask_probability: 0.15
             max_seq_length: 75
-            do_whole_word_mask: true
+            do_whole_word_mask: false
 
 model_config:
   fashionvil:
@@ -35,21 +32,6 @@ model_config:
         zero_init_residual: false
         num_output_features: -1
         pool_type: avg
-    image_tokenizer:
-      type: vqvae_encoder
-      params:
-        pretrained_path: ${env.data_dir}/pretrained_models/vqvae_ema_pp_224_7x7_encoder_fashionall.pth
-        resolution: 224
-        num_tokens: 1024
-        codebook_dim: 256
-        attn_resolutions: [7]
-        hidden_dim: 128
-        in_channels: 3
-        ch_mult: [1, 1, 2, 2, 4, 4]
-        num_res_blocks: 2
-        dropout: 0
-        z_channels: 256
-        double_z: false
     direct_features_input: false
     bypass_transformer: true
     bert_model_name: bert-base-uncased
@@ -57,20 +39,17 @@ model_config:
     task_for_inference: itc
     lr_multiplier: 20
     tasks:
-      - itc
       - pac
-      - mlm
-      - mpfc
 
 scheduler:
   type: multi_step
   params:
     use_warmup: true
     lr_steps:
-    - 45000
-    - 90000
+    - 11250
+    - 22500
     lr_ratio: 0.1
-    warmup_iterations: 15000
+    warmup_iterations: 3750
     warmup_factor: 0.25
 
 optimizer:
@@ -86,9 +65,9 @@ evaluation:
 
 training:
   experiment_name: fashionvil_e2e_pretrain_pac
-  batch_size: 128
+  batch_size: 256
   lr_scheduler: true
-  max_updates: 120000
+  max_updates: 30000
   log_interval: 10
   checkpoint_interval: 15000
   evaluation_interval: 1500
