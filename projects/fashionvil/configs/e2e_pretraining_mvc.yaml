@@ -10,6 +10,7 @@ includes:
 
 dataset_config:
   fashionall:
+    double_view: true
     processors:
         masked_token_processor:
           type: fashionvil_text_tokenizer

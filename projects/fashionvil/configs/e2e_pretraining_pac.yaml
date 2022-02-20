@@ -10,6 +10,7 @@ includes:
 
 dataset_config:
   fashionall:
+    attribute_label: true
     processors:
         masked_token_processor:
           type: fashionvil_text_tokenizer
@@ -64,7 +65,7 @@ evaluation:
   - type: r@k_general
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_pac
+  experiment_name: fashionvil_e2e_pretrain_pac_2s
   batch_size: 256
   lr_scheduler: true
   max_updates: 30000

@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Dict
 
 import torch
+import torch.nn.functional as F
 from mmf.models.composition import NormalizationLayer
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.modules.losses import (
@@ -23,6 +24,20 @@ from transformers.modeling_bert import (
     BertForPreTraining,
     BertPredictionHeadTransform,
 )
+
+
+class CosSim(nn.Module):
+    def __init__(self, nfeat, nclass):
+        super().__init__()
+        self.nfeat = nfeat
+        self.nclass = nclass
+        self.projection = nn.Parameter(torch.randn(nfeat, nclass), requires_grad=True)
+
+    def forward(self, x):
+        x = F.normalize(x, p=2, dim=1)
+        projection_norm = F.normalize(self.projection, p=2, dim=0)
+        logits = torch.matmul(x, projection_norm)
+        return logits
 
 
 class FashionViLForPretraining(FashionViLBaseModel):
@@ -90,13 +105,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 ),
             )
         if "pac" in self.tasks:
-            self.heads["pac"] = nn.Sequential(
-                BertPredictionHeadTransform(self.bert.config),
-                nn.Linear(
-                    self.bert.config.hidden_size,
-                    2232,
-                ),
-            )
+            self.heads["pac"] = CosSim(self.bert.config.hidden_size, 2232)
 
     def init_losses(self):
         self.loss_funcs["itc"] = ContrastiveLoss()
@@ -218,7 +227,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
                 dim=-1,
             )
 
-        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc", "pac", "icc"]:
+        if sample_list["task"] in ["itm", "mlm", "mpfr", "mpfc", "icc"]:
             sample_list["attention_mask"] = torch.cat(
                 (
                     sample_list["input_mask"],
@@ -450,19 +459,31 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_pac(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        _, pooled_output, _ = self.bert.get_joint_embedding(
+        visual_embeddings, _, _ = self.bert.get_image_embedding(
+            sample_list["image"], sample_list["visual_embeddings_type"]
+        )
+        visual_embeddings = visual_embeddings.mean(dim=1)
+
+        text_embeddings, _, _ = self.bert.get_text_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
-            sample_list["image"],
-            sample_list["visual_embeddings_type"],
-            sample_list["attention_mask"],
+            sample_list["input_mask"],
         )
-        logits = self.heads["pac"](pooled_output)
-        output_dict = {"scores": logits}
+        masks = sample_list["input_mask"]
+        text_embeddings = text_embeddings * masks.unsqueeze(2)
+        text_embeddings = torch.sum(text_embeddings, dim=1) / (
+            torch.sum(masks, dim=1, keepdim=True)
+        )
+
+        visual_logits = self.heads["pac"](visual_embeddings)
+        text_logits = self.heads["pac"](text_embeddings)
         sample_list.targets = sample_list.attribute_labels
 
         loss = {}
+        output_dict = {"scores": visual_logits}
         loss["pac_loss"] = self.loss_funcs["pac"](sample_list, output_dict)
+        output_dict = {"scores": text_logits}
+        loss["pac_loss"] += self.loss_funcs["pac"](sample_list, output_dict)
         output_dict["losses"] = loss
 
         return output_dict

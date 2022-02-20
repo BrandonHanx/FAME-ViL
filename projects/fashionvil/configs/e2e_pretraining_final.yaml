@@ -10,6 +10,7 @@ includes:
 
 dataset_config:
   fashionall:
+    double_view: true
     processors:
         masked_image_processor:
           type: blockwise_masked_patch
@@ -58,9 +59,9 @@ model_config:
     tasks:
       - itm
       - itc
+      - icc
       - mlm
       - mpfc
-      - 2wpa
 
 scheduler:
   type: multi_step
@@ -85,7 +86,7 @@ evaluation:
   - type: r@k_general
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_stable_wpa
+  experiment_name: fashionvil_e2e_pretrain_itc_icc
   batch_size: 256
   lr_scheduler: true
   max_updates: 120000
