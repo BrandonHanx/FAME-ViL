@@ -9,8 +9,8 @@ includes:
 - configs/models/fashionvil/defaults.yaml
 
 dataset_config:
-  double_view: true
   fashionall:
+    double_view: true
     processors:
         masked_token_processor:
           type: fashionvil_text_tokenizer

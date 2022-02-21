@@ -58,10 +58,18 @@ model_config:
     lr_multiplier: 20
     tasks:
       - itm
+      - pac
       - itc
       - icc
       - mlm
       - mpfc
+    tasks_sample_ratio:
+      - 0.15
+      - 0.15
+      - 0.2
+      - 0.2
+      - 0.15
+      - 0.15
 
 scheduler:
   type: multi_step
@@ -86,7 +94,7 @@ evaluation:
   - type: r@k_general
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_itc_icc
+  experiment_name: fashionvil_e2e_pretrain_final
   batch_size: 256
   lr_scheduler: true
   max_updates: 120000
