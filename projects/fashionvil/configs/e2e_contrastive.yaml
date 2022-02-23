@@ -46,7 +46,7 @@ optimizer:
 
 evaluation:
   metrics:
-    - r@k_general
+    - r@k_kaleido
 
 training:
   experiment_name: fashionvil_contrastive_fashiongen_e2e_pretrain_baseline
@@ -59,14 +59,14 @@ training:
   early_stop:
     criteria: fashiongen/r@k_general/avg
     minimize: false
-  wandb:
-    enabled: true
+  # wandb:
+  #   enabled: true
 
-run_type: train_val
+run_type: test
 
-checkpoint:
-  resume_pretrained: true
-  resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
-  pretrained_state_mapping:
-    image_encoder: image_encoder
-    model.bert: model.bert
+# checkpoint:
+#   resume_pretrained: true
+#   resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
+#   pretrained_state_mapping:
+#     image_encoder: image_encoder
+#     model.bert: model.bert

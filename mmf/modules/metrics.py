@@ -1323,6 +1323,119 @@ class RecallAtK_general(BaseMetric):
         return dict(zip(keys, values))
 
 
+@registry.register_metric("r@k_kaleido")
+class RecallAtK_kaleido(BaseMetric):
+    def __init__(self, name="recall@k_kaleido"):
+        super().__init__(name)
+        self.required_params = [
+            "scores",
+            "targets",
+            "image_id",
+            "text_id",
+            "image_subcat_id",
+            "text_subcat_id",
+        ]
+
+    def _get_rk(
+        self,
+        q_ids: Tensor,
+        g_ids: Tensor,
+        q_embeddings: Tensor,
+        g_embeddings: Tensor,
+        q_subcat_ids: Tensor,
+        g_subcat_ids: Tensor,
+        k: Tensor = torch.tensor([1, 5, 10], dtype=torch.long),
+    ):
+        # randomly select 1000 query
+        q_idx = torch.randint(low=0, high=len(q_ids), size=(1000,))
+        q_ids = q_ids[q_idx]
+        q_embeddings = q_embeddings[q_idx]
+        q_subcat_ids = q_subcat_ids[q_idx]
+
+        # calculate similarity
+        sim = q_embeddings @ g_embeddings.t()
+
+        # generate 101 galley including 1 positive and 100 negative
+        sim_mask = torch.zeros_like(sim)
+        id_matrix = q_ids.unsqueeze(-1).eq(g_ids.unsqueeze(0))
+        subcat_id_matrix = q_subcat_ids.unsqueeze(-1).eq(g_subcat_ids.unsqueeze(0))
+        subcat_id_matrix[
+            id_matrix
+        ] = False  # sample negative with same subcat but not id
+        # generate positive
+        random_matrix = torch.rand(sim.shape)
+        random_matrix[~id_matrix] = -1
+        _, pos_idxs = torch.topk(
+            random_matrix, k=1, dim=1, largest=True, sorted=True
+        )  # 1000 x 1
+        # generate negative
+        random_matrix = torch.rand(sim.shape)
+        random_matrix[~subcat_id_matrix] = -1
+        _, neg_idxs = torch.topk(
+            random_matrix, k=100, dim=1, largest=True, sorted=True
+        )  # 1000 x 100
+        selected_idxs = torch.cat([pos_idxs, neg_idxs], dim=1)  # 1000 x 101
+        sim_mask[torch.arange(sim_mask.size(0)).unsqueeze(1), selected_idxs] = 1
+
+        sim[sim_mask == 0] = -1
+        # acclerate sort with topk
+        max_sim, indices = torch.topk(
+            sim, k=max(k), dim=1, largest=True, sorted=True
+        )  # q * k
+        pred_labels = g_ids[indices]  # q * k
+        matches = pred_labels.eq(q_ids.view(-1, 1))  # q * k
+
+        all_cmc = matches[:, : max(k)].cumsum(1)
+        all_cmc[all_cmc > 1] = 1
+        all_cmc = all_cmc.float().mean(0)
+        ratk = all_cmc[k - 1]
+        return ratk
+
+    def calculate(
+        self,
+        sample_list: Dict[str, Tensor],
+        model_output: Dict[str, Tensor],
+        *args,
+        **kwargs,
+    ):
+        image_embeddings = model_output["scores"]
+        text_embeddings = model_output["targets"]
+        image_ids = sample_list["image_id"].squeeze()
+        text_ids = sample_list["text_id"].squeeze()
+        image_subcat_ids = sample_list["image_subcat_id"]
+        text_subcat_ids = sample_list["text_subcat_id"]
+
+        keys = [
+            f"i2t_r@1",
+            f"i2t_r@5",
+            f"i2t_r@10",
+            f"t2i_r@1",
+            f"t2i_r@5",
+            f"t2i_r@10",
+            f"avg",
+        ]
+        values = torch.zeros((5, 7), device=image_embeddings.device)
+        for i in range(5):
+            values[i, :3] = self._get_rk(
+                image_ids,
+                text_ids,
+                image_embeddings,
+                text_embeddings,
+                image_subcat_ids,
+                text_subcat_ids,
+            )
+            values[i, 3:6] = self._get_rk(
+                text_ids,
+                image_ids,
+                text_embeddings,
+                image_embeddings,
+                text_subcat_ids,
+                image_subcat_ids,
+            )
+            values[i, 6] = torch.mean(values[i, :-1])
+        return dict(zip(keys, torch.mean(values, dim=0)))
+
+
 @registry.register_metric("r@k_ocir")
 class RecallAtK_ocir(BaseMetric):
     def __init__(self, name="recall@k_ocir"):
