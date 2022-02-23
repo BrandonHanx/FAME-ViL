@@ -46,6 +46,9 @@ class FashionViLForPretraining(FashionViLBaseModel):
         self.task_for_inference = config.task_for_inference
         self.tasks = config.tasks
         self.double_view = config.get("double_view", False)
+        self.no_sharing = config.get("no_sharing", False)
+        if self.no_sharing:
+            self.bert_2 = deepcopy(self.bert)
 
         self.contrastive_norm = NormalizationLayer()
         self.heads = nn.ModuleDict()
@@ -62,6 +65,21 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
         self.init_heads()
         self.init_losses()
+
+    def get_image_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.no_sharing:
+            return self.bert_2.get_image_embedding(sample_list)
+        else:
+            return self.bert.get_image_embedding(sample_list)
+
+    def get_text_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        if self.no_sharing:
+            return self.bert_2.get_text_embedding(sample_list)
+        else:
+            return self.bert.get_text_embedding(sample_list)
+
+    def get_joint_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        return self.bert.get_joint_embedding(sample_list)
 
     def init_heads(self):
         if "itm" in self.tasks:
@@ -246,13 +264,13 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return sample_list
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
+        visual_embeddings, _, _ = self.get_image_embedding(
             sample_list["image"], sample_list["visual_embeddings_type"]
         )
         visual_embeddings = visual_embeddings.mean(dim=1)
         visual_embeddings = self.contrastive_norm(visual_embeddings)
 
-        text_embeddings, _, _ = self.bert.get_text_embedding(
+        text_embeddings, _, _ = self.get_text_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["input_mask"],
@@ -277,7 +295,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def _forward_itm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         sample_list = self.get_hard_pairs(sample_list)
-        _, pooled_output, _ = self.bert.get_joint_embedding(
+        _, pooled_output, _ = self.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["image"],
@@ -295,7 +313,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_mlm(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        sequence_output, _, _ = self.bert.get_joint_embedding(
+        sequence_output, _, _ = self.get_joint_embedding(
             sample_list["input_ids_masked"],
             sample_list["segment_ids"],
             sample_list["image"],
@@ -321,7 +339,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_mpfr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        hidden, _, _ = self.bert.get_joint_embedding(
+        hidden, _, _ = self.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["masked_image"],
@@ -353,7 +371,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_mpfc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        hidden, _, _ = self.bert.get_joint_embedding(
+        hidden, _, _ = self.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["masked_image"],
@@ -387,12 +405,12 @@ class FashionViLForPretraining(FashionViLBaseModel):
 
     def _forward_2wpa(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         sample_list = self.get_hard_pairs(sample_list)
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
+        visual_embeddings, _, _ = self.get_image_embedding(
             sample_list["image"], sample_list["visual_embeddings_type"]
         )
         image_pad = torch.zeros_like(sample_list["visual_embeddings_type"]).bool()
 
-        text_embeddings, _, _ = self.bert.get_text_embedding(
+        text_embeddings, _, _ = self.get_text_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["input_mask"],
@@ -416,13 +434,13 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_mvc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
+        visual_embeddings, _, _ = self.get_image_embedding(
             sample_list["image_0"], sample_list["visual_embeddings_type"]
         )
         visual_embeddings = visual_embeddings.mean(dim=1)
         visual_embeddings = self.contrastive_norm(visual_embeddings)
 
-        text_embeddings, _, _ = self.bert.get_text_embedding(
+        text_embeddings, _, _ = self.get_text_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["input_mask"],
@@ -434,7 +452,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         )
         text_embeddings = self.contrastive_norm(text_embeddings)
 
-        comp_embeddings, _, _ = self.bert.get_joint_embedding(
+        comp_embeddings, _, _ = self.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["image_1"],
@@ -459,12 +477,12 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_pac(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
+        visual_embeddings, _, _ = self.get_image_embedding(
             sample_list["image"], sample_list["visual_embeddings_type"]
         )
         visual_embeddings = visual_embeddings.mean(dim=1)
 
-        text_embeddings, _, _ = self.bert.get_text_embedding(
+        text_embeddings, _, _ = self.get_text_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["input_mask"],
@@ -489,7 +507,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         return output_dict
 
     def _forward_icc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        visual_embeddings, _, _ = self.bert.get_image_embedding(
+        visual_embeddings, _, _ = self.get_image_embedding(
             sample_list["image"], sample_list["visual_embeddings_type"]
         )
         visual_embeddings = visual_embeddings.mean(dim=1)
@@ -509,7 +527,7 @@ class FashionViLForPretraining(FashionViLBaseModel):
         )
         sample_list["attention_mask"][:, text_dropout_index] = 0
         sample_list["attention_mask"][:, pacth_dropout_index] = 0
-        comp_embeddings, _, _ = self.bert.get_joint_embedding(
+        comp_embeddings, _, _ = self.get_joint_embedding(
             sample_list["input_ids"],
             sample_list["segment_ids"],
             sample_list["dv_image"],
