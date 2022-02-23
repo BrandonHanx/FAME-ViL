@@ -105,7 +105,7 @@ class FashionDataset(MMFDataset):
                 current_sample.image = features
 
             current_sample.text_id = torch.tensor(sample_info["id"], dtype=torch.long)
-            current_sample.image_id = current_sample.text_id.repeat(len(image_path), 1)
+            current_sample.image_id = current_sample.text_id.repeat(len(image_path))
 
             if self._category_label:
                 current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long).repeat(len(image_path))

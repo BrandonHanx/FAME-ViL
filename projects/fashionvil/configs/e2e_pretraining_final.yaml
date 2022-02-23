@@ -10,6 +10,7 @@ includes:
 
 dataset_config:
   fashionall:
+    attribute_label: true
     double_view: true
     processors:
         masked_image_processor:
