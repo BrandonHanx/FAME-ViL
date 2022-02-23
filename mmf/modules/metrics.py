@@ -1407,10 +1407,10 @@ class RecallAtK_kaleido(BaseMetric):
 
         keys = [
             f"i2t_r@1",
-            f"t2i_r@1",
             f"i2t_r@5",
-            f"t2i_r@5",
             f"i2t_r@10",
+            f"t2i_r@1",
+            f"t2i_r@5",
             f"t2i_r@10",
             f"avg",
         ]
