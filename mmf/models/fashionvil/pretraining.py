@@ -66,20 +66,20 @@ class FashionViLForPretraining(FashionViLBaseModel):
         self.init_heads()
         self.init_losses()
 
-    def get_image_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def get_image_embedding(self, *args, **kwargs):
         if self.no_sharing:
-            return self.bert_2.get_image_embedding(sample_list)
+            return self.bert_2.get_image_embedding(*args, **kwargs)
         else:
-            return self.bert.get_image_embedding(sample_list)
+            return self.bert.get_image_embedding(*args, **kwargs)
 
-    def get_text_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def get_text_embedding(self, *args, **kwargs):
         if self.no_sharing:
-            return self.bert_2.get_text_embedding(sample_list)
+            return self.bert_2.get_text_embedding(*args, **kwargs)
         else:
-            return self.bert.get_text_embedding(sample_list)
+            return self.bert.get_text_embedding(*args, **kwargs)
 
-    def get_joint_embedding(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        return self.bert.get_joint_embedding(sample_list)
+    def get_joint_embedding(self, *args, **kwargs):
+        return self.bert.get_joint_embedding(*args, **kwargs)
 
     def init_heads(self):
         if "itm" in self.tasks:
