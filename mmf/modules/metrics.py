@@ -1347,7 +1347,7 @@ class RecallAtK_kaleido(BaseMetric):
         k: Tensor = torch.tensor([1, 5, 10], dtype=torch.long),
     ):
         # randomly select 1000 query
-        q_idx = torch.randint(low=0, high=len(q_ids), size=(1000,))
+        q_idx = torch.randperm(len(q_ids))[:1000]
         q_ids = q_ids[q_idx]
         q_embeddings = q_embeddings[q_idx]
         q_subcat_ids = q_subcat_ids[q_idx]
@@ -1359,18 +1359,18 @@ class RecallAtK_kaleido(BaseMetric):
         sim_mask = torch.zeros_like(sim)
         id_matrix = q_ids.unsqueeze(-1).eq(g_ids.unsqueeze(0))
         subcat_id_matrix = q_subcat_ids.unsqueeze(-1).eq(g_subcat_ids.unsqueeze(0))
-        subcat_id_matrix[
-            id_matrix
-        ] = False  # sample negative with same subcat but not id
+
         # generate positive
         random_matrix = torch.rand(sim.shape)
         random_matrix[~id_matrix] = -1
         _, pos_idxs = torch.topk(
             random_matrix, k=1, dim=1, largest=True, sorted=True
         )  # 1000 x 1
+
         # generate negative
         random_matrix = torch.rand(sim.shape)
         random_matrix[~subcat_id_matrix] = -1
+        random_matrix[id_matrix] = -100  # sample negative with same subcat but not id
         _, neg_idxs = torch.topk(
             random_matrix, k=100, dim=1, largest=True, sorted=True
         )  # 1000 x 100
