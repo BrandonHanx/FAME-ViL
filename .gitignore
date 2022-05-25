@@ -33,4 +33,5 @@ wandb/
 logs/
 .netrc
 condor_log/
-docker_stderror
+docker_stderror/
+visualization/
