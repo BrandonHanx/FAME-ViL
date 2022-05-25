@@ -26,6 +26,7 @@ class FashionViL(BaseModel):
 
         self.double_view = config.get("double_view", False)
         self.freeze_image_encoder = config.get("freeze_image_encoder", False)
+        self.multiple_image_input = config.get("multiple_image_input", False)
 
         if self.training_head_type == "pretraining":
             self.task_for_inference = config.task_for_inference
@@ -106,19 +107,13 @@ class FashionViL(BaseModel):
         if self.training_head_type == "composition":
             sample_list.ref_image = self.image_encoder(sample_list.ref_image)
             sample_list.tar_image = self.image_encoder(sample_list.tar_image)
-        # elif self.double_view and self.training:
-        #     sample_list.original_image = torch.cat(
-        #         (sample_list.image, sample_list.dv_image), dim=0
-        #     )
-        #     sample_list.image_0 = self.image_encoder(sample_list.image)
-        #     sample_list.image_1 = self.image_encoder(sample_list.dv_image)
-        #     sample_list.image = torch.cat(
-        #         (sample_list.image_0, sample_list.image_1), dim=0
-        #     )
         else:
             if sample_list.image.dim() > 4:
                 sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
-                sample_list.image_id = torch.flatten(sample_list.image_id, end_dim=-2)
+                if hasattr(sample_list, "image_id"):
+                    sample_list.image_id = torch.flatten(
+                        sample_list.image_id, end_dim=-2
+                    )
             if sample_list.input_mask.dim() > 2:
                 sample_list.input_mask = torch.flatten(
                     sample_list.input_mask, end_dim=-2
@@ -131,6 +126,9 @@ class FashionViL(BaseModel):
                 sample_list.targets = torch.flatten(sample_list.targets)
             sample_list.original_image = sample_list.image
             sample_list.image = self.image_encoder(sample_list.image)
+            if self.multiple_image_input:
+                b, l, d = sample_list.image.shape
+                sample_list.image = sample_list.image.view(b // 4, 4 * l, d)
 
         if self.training_head_type == "pretraining" and sample_list.task == "icc":
             sample_list.dv_image = self.image_encoder(sample_list.dv_image)

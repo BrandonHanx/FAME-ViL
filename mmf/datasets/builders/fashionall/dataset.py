@@ -31,6 +31,7 @@ class FashionDataset(MMFDataset):
         self._attribute_label = config.get("attribute_label", False)
         self._category_label = config.get("category_label", False)
         self._subcategory_label = config.get("subcategory_label", False)
+        self._multiple_image_input = config.get("multiple_image_input", False)
 
     def init_processors(self):
         super().init_processors()
@@ -68,12 +69,18 @@ class FashionDataset(MMFDataset):
         image_path = sample_info["image_path"]
         if self._dataset_type == "train":
             if not self._double_view:
-                image_path = random.choices(image_path)[0]
-                if self._use_images:
-                    current_sample.image = self.image_db.from_path(image_path)["images"][0]
-                elif self._use_features:
-                    feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
-                    current_sample.image = self.features_db.from_path(feature_path)["image_feature_0"]
+                if self._multiple_image_input:
+                    image_path = random.choices(image_path, k=4)
+                    images = self.image_db.from_path(image_path)["images"]
+                    images = torch.stack(images)
+                    current_sample.image = images
+                else:
+                    image_path = random.choices(image_path)[0]
+                    if self._use_images:
+                        current_sample.image = self.image_db.from_path(image_path)["images"][0]
+                    elif self._use_features:
+                        feature_path = ".".join(image_path.split(".")[:-1]) + ".npy"
+                        current_sample.image = self.features_db.from_path(feature_path)["image_feature_0"]
             else:
                 # FIXME: don't support features loading under double view mode
                 assert self._use_images
@@ -93,6 +100,14 @@ class FashionDataset(MMFDataset):
                 current_sample.targets = torch.tensor(1, dtype=torch.long)
         else:
             if self._use_images:
+                if self._multiple_image_input:
+                    image_path = image_path[:4]
+                    if len(image_path) == 1:
+                        image_path = [image_path[0]] * 4
+                    elif len(image_path) == 2:
+                        image_path = [image_path[0], image_path[1], image_path[0], image_path[1]]
+                    elif len(image_path) == 3:
+                        image_path = [image_path[0], image_path[1], image_path[2], image_path[0]]
                 images = self.image_db.from_path(image_path)["images"]
                 images = torch.stack(images)
                 current_sample.image = images
@@ -105,23 +120,24 @@ class FashionDataset(MMFDataset):
                 current_sample.image = features
 
             current_sample.text_id = torch.tensor(sample_info["id"], dtype=torch.long)
-            current_sample.image_id = current_sample.text_id.repeat(len(image_path))
+            current_sample.image_id = current_sample.text_id
             if "subcategory_id" in sample_info:
                 current_sample.text_subcat_id = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
                 current_sample.image_subcat_id = current_sample.text_subcat_id.repeat(len(image_path))
 
             if self._category_label:
-                current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long).repeat(len(image_path))
-                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
-                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
-                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+                current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long)
             elif self._subcategory_label:
-                current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long).repeat(len(image_path))
-                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
-                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
-                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+                current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
             else:
                 current_sample.targets = torch.tensor(1, dtype=torch.long)
+
+            if not self._multiple_image_input:
+                current_sample.image_id = current_sample.image_id.repeat(len(image_path))
+                current_sample.targets = current_sample.targets.repeat(len(image_path))
+                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
+                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
+                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
 
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
 

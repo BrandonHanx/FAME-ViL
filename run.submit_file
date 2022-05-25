@@ -16,7 +16,7 @@ environment = "mount=/vol/research/xmodal_dl/"
 should_transfer_files = True
 stream_output = True
 
-request_GPUs     = 1
+request_GPUs     = 2
 request_CPUs     = 1
 request_memory = 16G
 requirements = (CUDAGlobalMemoryMb > 4500) && \
@@ -25,5 +25,5 @@ requirements = (CUDAGlobalMemoryMb > 4500) && \
                (CUDADeviceName == "GeForce RTX 3090")
 
 queue arguments from (
-  config=$ENV(PWD)/projects/fashion_comp_retrieval/configs/fashioniq/fashionvil.yaml model=fashionvil dataset=fashioniq
+  config=$ENV(PWD)/projects/fashionvil/configs/e2e_classification_multiple.yaml model=fashionvil dataset=fashiongen
 )
