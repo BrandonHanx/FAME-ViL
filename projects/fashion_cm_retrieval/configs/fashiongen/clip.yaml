@@ -1,0 +1,63 @@
+# FashionGen data nums: 60147
+
+includes:
+- configs/models/clip/defaults.yaml
+
+dataset_config:
+  fashiongen:
+    processors:
+      text_processor:
+        type: copy_sentence
+      eval_image_processor:
+        type: torchvision_transforms
+        params:
+          transforms:
+            - type: Resize
+              params:
+                size: [256, 256]
+            - type: CenterCrop
+              params:
+                size: [224, 224]
+            - ToTensor
+            - type: Normalize
+              params:
+                mean: [0.48145466, 0.4578275, 0.40821073]
+                std: [0.26862954, 0.26130258, 0.27577711]
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 28170
+    - 56340
+    lr_ratio: 0.1
+    warmup_iterations: 939
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+  - r@k_kaleido
+
+training:
+  experiment_name: clip_fashiongen
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 75120
+  log_interval: 10
+  checkpoint_interval: 939
+  evaluation_interval: 939
+  early_stop:
+    criteria: fashiongen/r@k_general/avg
+    minimize: false
+  # wandb:
+  #   enabled: true
+
+run_type: test

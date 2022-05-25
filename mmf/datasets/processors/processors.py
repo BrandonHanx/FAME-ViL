@@ -1091,6 +1091,12 @@ class SimpleSentenceProcessor(BaseProcessor):
         return {"text": self.tokenizer(item["text"], *args, **kwargs)}
 
 
+@registry.register_processor("copy_sentence")
+class CopySentenceProcessor(BaseProcessor):
+    def __call__(self, item, *args, **kwargs):
+        return {"text": item["text"]}
+
+
 @registry.register_processor("bbox")
 class BBoxProcessor(VocabProcessor):
     """Generates bboxes in proper format.
