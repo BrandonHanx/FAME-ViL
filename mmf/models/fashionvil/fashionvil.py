@@ -110,7 +110,7 @@ class FashionViL(BaseModel):
         else:
             if sample_list.image.dim() > 4:
                 sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
-                if hasattr(sample_list, "image_id"):
+                if hasattr(sample_list, "image_id") and sample_list.image_id.dim() > 2:
                     sample_list.image_id = torch.flatten(
                         sample_list.image_id, end_dim=-2
                     )
