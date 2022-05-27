@@ -18,6 +18,7 @@ class CLIP(BaseModel):
 
     def build(self):
         self.model, _ = clip.load(self.config.name)
+        self.model = self.model.float()
 
     def forward(self, sample_list):
         if sample_list.image.dim() > 4:

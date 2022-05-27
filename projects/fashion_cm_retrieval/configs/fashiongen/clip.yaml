@@ -3,6 +3,12 @@
 includes:
 - configs/models/clip/defaults.yaml
 
+model_config:
+  clip:
+    name: RN50
+    losses:
+      - type: contrastive_loss
+
 dataset_config:
   fashiongen:
     processors:
@@ -44,7 +50,7 @@ optimizer:
 
 evaluation:
   metrics:
-  - r@k_kaleido
+  - r@k_general
 
 training:
   experiment_name: clip_fashiongen
@@ -57,7 +63,7 @@ training:
   early_stop:
     criteria: fashiongen/r@k_general/avg
     minimize: false
-  # wandb:
-  #   enabled: true
+  wandb:
+    enabled: true
 
-run_type: test
+run_type: train_val

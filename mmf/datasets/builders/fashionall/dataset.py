@@ -135,9 +135,10 @@ class FashionDataset(MMFDataset):
             if not self._multiple_image_input:
                 current_sample.image_id = current_sample.image_id.repeat(len(image_path))
                 current_sample.targets = current_sample.targets.repeat(len(image_path))
-                current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
-                current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
-                current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+                if hasattr(current_sample, "input_ids"):
+                    current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
+                    current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
+                    current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
 
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
 

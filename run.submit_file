@@ -11,19 +11,18 @@ environment = "mount=/vol/research/xmodal_dl/"
 
 +CanCheckpoint = True
 +GPUMem = 20000
-+JobRunTime = 10
++JobRunTime = 72
 
 should_transfer_files = True
 stream_output = True
 
-request_GPUs     = 2
+request_GPUs     = 1
 request_CPUs     = 1
 request_memory = 16G
 requirements = (CUDAGlobalMemoryMb > 4500) && \
                (HasDocker) && \
-               (CUDACapability > 2.0) && \
-               (CUDADeviceName == "GeForce RTX 3090")
+               (CUDACapability > 2.0)
 
 queue arguments from (
-  config=$ENV(PWD)/projects/fashionvil/configs/e2e_classification_multiple.yaml model=fashionvil dataset=fashiongen
+  config=$ENV(PWD)/projects/fashion_cm_retrieval/configs/fashiongen/clip.yaml model=clip dataset=fashiongen
 )
