@@ -6,6 +6,7 @@ includes:
 model_config:
   clip:
     name: RN50
+    lr_multiplier: 20
     losses:
       - type: contrastive_loss
 

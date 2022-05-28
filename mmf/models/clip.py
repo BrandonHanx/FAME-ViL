@@ -4,6 +4,7 @@ import clip
 import torch
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
+from mmf.utils.modeling import get_clip_text_encoder_configured_parameters
 
 
 @registry.register_model("clip")
@@ -19,6 +20,24 @@ class CLIP(BaseModel):
     def build(self):
         self.model, _ = clip.load(self.config.name)
         self.model = self.model.float()
+
+    def get_optimizer_parameters(self, config):
+        base_lr = config.optimizer.params.lr
+        weight_decay = config.optimizer.params.weight_decay
+        lr_multiplier = self.config.lr_multiplier
+
+        text_encoder_params = get_clip_text_encoder_configured_parameters(
+            self.model,
+            base_lr,
+            weight_decay,
+        )
+        image_encoder_params = [
+            {
+                "params": self.model.visual.parameters(),
+                "lr": base_lr * lr_multiplier,
+            }
+        ]
+        return image_encoder_params + text_encoder_params
 
     def forward(self, sample_list):
         if sample_list.image.dim() > 4:

@@ -74,6 +74,41 @@ def get_bert_configured_parameters(module, lr=None, weight_decay=0.01):
     return optimizer_grouped_parameters
 
 
+def get_clip_text_encoder_configured_parameters(module, lr=None, weight_decay=0.01):
+    # module param can either be a nn.Module or in some cases can also be
+    # a list of named parameters for a nn.Module
+    if isinstance(module, nn.Module):
+        param_optimizer = list(module.named_parameters())
+    elif isinstance(module, list):
+        param_optimizer = module
+
+    no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p
+                for n, p in param_optimizer
+                if not any(nd in n for nd in no_decay) and not n.startswith("visual")
+            ],
+            "weight_decay": weight_decay,
+        },
+        {
+            "params": [
+                p
+                for n, p in param_optimizer
+                if any(nd in n for nd in no_decay) and not n.startswith("visual")
+            ],
+            "weight_decay": 0.0,
+        },
+    ]
+
+    if lr is not None:
+        for p in optimizer_grouped_parameters:
+            p["lr"] = lr
+
+    return optimizer_grouped_parameters
+
+
 def get_optimizer_parameters_for_bert(module, config):
     lr = config.optimizer.params.lr
     model_config = config.model_config.get(config.model, {})
