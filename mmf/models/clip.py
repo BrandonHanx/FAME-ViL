@@ -4,6 +4,7 @@ import clip
 import torch
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
+from mmf.models.composition import NormalizationLayer
 from mmf.utils.modeling import get_clip_text_encoder_configured_parameters
 
 
@@ -12,6 +13,7 @@ class CLIP(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
+        self.norm_layer = NormalizationLayer()
 
     @classmethod
     def config_path(cls):
@@ -47,8 +49,8 @@ class CLIP(BaseModel):
         text_feats = self.model.encode_text(text)
 
         output = {
-            "scores": image_feats,
-            "targets": text_feats,
+            "scores": self.norm_layer(image_feats),
+            "targets": self.norm_layer(text_feats),
         }
 
         return output
