@@ -39,7 +39,13 @@ class CLIP(BaseModel):
                 "lr": base_lr * lr_multiplier,
             }
         ]
-        return image_encoder_params + text_encoder_params
+        rest_params = [
+            {
+                "params": self.norm_layer.parameters(),
+                "lr": base_lr,
+            }
+        ]
+        return image_encoder_params + text_encoder_params + rest_params
 
     def forward(self, sample_list):
         if sample_list.image.dim() > 4:
