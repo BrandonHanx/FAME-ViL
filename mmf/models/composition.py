@@ -9,7 +9,6 @@ import torch.nn as nn
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
 from mmf.modules.encoders import IdentityEncoder
-from mmf.modules.layers import AttnPool1d
 from mmf.utils.build import (
     build_classifier_layer,
     build_image_encoder,
@@ -78,6 +77,7 @@ class BaseComposition(BaseModel):
         norm_layer: Any = MISSING
         image_projection: Any = IdentityEncoder.Config()
         text_projection: Any = IdentityEncoder.Config()
+        lr_multiplier: float = 1.0
 
     def __init__(self, config: Config):
         """Initialize the config which is the model configuration."""
@@ -130,10 +130,6 @@ class SimpleComposition(BaseComposition):
         text_proj_config = deepcopy(self.config.text_projection)
         self.text_proj = build_classifier_layer(text_proj_config)
 
-        # Aggregators
-        self.image_pool = AttnPool1d(self.config.final_hidden_size, 1)
-        self.text_pool = AttnPool1d(self.config.final_hidden_size, 1)
-
         if self.config.compositor.type == "tirg":
             self.compositor = TIRG(**self.config.compositor.params)
         else:
@@ -143,18 +139,16 @@ class SimpleComposition(BaseComposition):
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
-        bert_params = get_bert_configured_parameters(self.text_encoder, base_lr * 0.05)
+        bert_params = get_bert_configured_parameters(self.text_encoder, base_lr)
         backbone_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr,
+                "lr": base_lr * self.config.lr_multiplier,
             }
         ]
         rest_params = [
             {"params": filter_grads(self.image_proj.parameters()), "lr": base_lr},
             {"params": filter_grads(self.text_proj.parameters()), "lr": base_lr},
-            {"params": filter_grads(self.image_pool.parameters()), "lr": base_lr},
-            {"params": filter_grads(self.text_pool.parameters()), "lr": base_lr},
             {"params": filter_grads(self.compositor.parameters()), "lr": base_lr},
             {"params": filter_grads(self.norm_layer.parameters()), "lr": base_lr},
         ]
@@ -163,46 +157,47 @@ class SimpleComposition(BaseComposition):
         return training_parameters
 
     def preprocess_text(self, sample_list) -> Tuple:
-        text = transform_to_batch_sequence(sample_list.input_ids)
-        mask = transform_to_batch_sequence(sample_list.input_mask)
-        segment = transform_to_batch_sequence(sample_list.segment_ids)
+        if hasattr(sample_list, "input_ids"):
+            text = transform_to_batch_sequence(sample_list.input_ids)
+            mask = transform_to_batch_sequence(sample_list.input_mask)
+            segment = transform_to_batch_sequence(sample_list.segment_ids)
+            return text, mask, segment
+        else:
+            return sample_list.text
 
-        return (text, mask, segment)
+    def preprocess_image(self, image):
+        if image.dim() > 4:
+            image = torch.flatten(image, end_dim=-4)
+        return image
 
-    def _get_image_embedding(self, image_data) -> Tuple[torch.Tensor, torch.Tensor]:
-        # image_data shape B x 3 x 224 x 224
-        src = self.image_encoder(image_data)
-        # src shape B x 49 x 2048
-        if isinstance(src, dict):
-            src = src[0]
-        # Image embedding
-        image_proj = self.image_proj(src)
-        # image_proj shape B x 49 x 512
-        # image_pool = self.image_pool(image_proj, image_proj).squeeze(1)
-        image_pool = image_proj.mean(dim=1)
-        return image_pool
+    def _get_image_embedding(self, image_data):
+        image_feats = self.image_encoder(image_data)
+        image_feats = self.image_proj(image_feats)
+        return image_feats
 
     def get_ref_image_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self._get_image_embedding(sample_list.ref_image)
+        ref_image = self.preprocess_image(sample_list.ref_image)
+        return self._get_image_embedding(ref_image)
 
     def get_tar_image_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self.norm_layer(self._get_image_embedding(sample_list.tar_image))
+        tar_image = self.preprocess_image(sample_list.tar_image)
+        return self.norm_layer(self._get_image_embedding(tar_image))
 
     def get_text_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
-        text, mask, segment = self.preprocess_text(sample_list)
+        text_data = self.preprocess_text(sample_list)
 
-        text_enc = self.text_encoder(text, mask, segment)
+        text_enc = self.text_encoder(text_data)
 
-        # Text embedding
-        text_proj = self.text_proj(text_enc[0])
-        # text_pool = self.text_pool(text_proj, text_proj, mask.eq(0)).squeeze(1)
-        masks = sample_list["input_mask"]
-        text_proj = text_proj * masks.unsqueeze(2)
-        text_pool = torch.sum(text_proj, dim=1) / (
-            torch.sum(masks, dim=1, keepdim=True)
-        )
-
-        return text_pool
+        if hasattr(sample_list, "input_mask"):
+            text_proj = self.text_proj(text_enc[0])
+            masks = sample_list["input_mask"]
+            text_proj = text_proj * masks.unsqueeze(2)
+            text_proj = torch.sum(text_proj, dim=1) / (
+                torch.sum(masks, dim=1, keepdim=True)
+            )
+            return text_proj
+        else:
+            return text_enc
 
     def get_comp_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
         ref_img_ebd = self.get_ref_image_embedding(sample_list)

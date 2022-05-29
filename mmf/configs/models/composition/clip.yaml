@@ -1,0 +1,34 @@
+model_config:
+  simple_composition:
+    lr_multiplier: 1
+    final_hidden_size: 1024
+    direct_features_input: false
+
+    image_encoder:
+      type: clip_image_encoder
+      params:
+        name: RN50
+
+    text_encoder:
+      type: clip_text_encoder
+      params:
+        name: RN50
+
+    image_projection:
+      type: identity
+
+    text_projection:
+      type: identity
+
+    compositor:
+      type: tirg
+      params:
+        text_channel: ${model_config.simple_composition.final_hidden_size}
+        img_channel: ${model_config.simple_composition.final_hidden_size}
+
+    norm_layer:
+      normalize_scale: 4.0
+      learn_scale: True
+
+    losses:
+    - type: bbc_loss

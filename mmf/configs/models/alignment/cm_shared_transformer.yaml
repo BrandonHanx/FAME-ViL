@@ -1,8 +1,8 @@
 model_config:
-  simple_alignment:
+  cm_shared_transformer:
     final_hidden_size: 512
     norm_img_embeddings: false
-    norm_text_embeddings: false
+    norm_text_embeddings: true
     direct_features_input: false
 
     image_encoder:
@@ -28,13 +28,13 @@ model_config:
       type: linear
       params:
         in_dim: 2048
-        out_dim: ${model_config.simple_alignment.final_hidden_size}
+        out_dim: ${model_config.cm_shared_transformer.final_hidden_size}
 
     text_projection:
       type: linear
       params:
         in_dim: 768
-        out_dim: ${model_config.simple_alignment.final_hidden_size}
+        out_dim: ${model_config.cm_shared_transformer.final_hidden_size}
 
     losses:
     - type: in_batch_hinge

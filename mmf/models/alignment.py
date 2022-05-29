@@ -8,6 +8,7 @@ from typing import Any, Tuple
 import torch
 from mmf.common.registry import registry
 from mmf.models.base_model import BaseModel
+from mmf.models.composition import NormalizationLayer
 from mmf.modules.encoders import IdentityEncoder
 from mmf.modules.layers import AttnPool1d
 from mmf.utils.build import (
@@ -78,12 +79,13 @@ class BaseAlign(BaseModel):
         final_hidden_size: int = 512
         # whether to normalize the embedding
         norm_img_embeddings: bool = False
-        norm_text_embeddings: bool = True
+        norm_text_embeddings: bool = False
         direct_features_input: bool = False
         image_encoder: Any = MISSING
         text_encoder: Any = MISSING
         image_projection: Any = IdentityEncoder.Config()
         text_projection: Any = IdentityEncoder.Config()
+        lr_multiplier: float = 1.0
 
     def __init__(self, config: Config):
         """Initialize the config which is the model configuration."""
@@ -103,6 +105,104 @@ class BaseAlign(BaseModel):
         raise NotImplementedError("Text Encoder not implemented")
 
 
+@registry.register_model("simple_alignment")
+class SimpleAlignment(BaseAlign):
+    def __init__(self, config: BaseAlign.Config):
+        """Initialize the config which is the model configuration."""
+        super().__init__(config)
+        self.config = config
+        self.build()
+
+    @classmethod
+    def config_path(cls):
+        return "configs/models/alignment/defaults.yaml"
+
+    def build(self):
+        self._is_direct_features_input = self.config.direct_features_input
+        # Encoders
+        self.text_encoder = build_text_encoder(self.config.text_encoder)
+        self.image_encoder = build_image_encoder(
+            self.config.image_encoder, self._is_direct_features_input
+        )
+
+        # Projectors
+        image_proj_config = deepcopy(self.config.image_projection)
+        self.image_proj = build_classifier_layer(image_proj_config)
+
+        text_proj_config = deepcopy(self.config.text_projection)
+        self.text_proj = build_classifier_layer(text_proj_config)
+
+        self.norm_layer = NormalizationLayer()
+
+    def get_optimizer_parameters(self, config):
+        base_lr = config.optimizer.params.lr
+        bert_params = get_bert_configured_parameters(self.text_encoder, base_lr)
+        backbone_params = [
+            {
+                "params": filter_grads(self.image_encoder.parameters()),
+                "lr": base_lr * self.config.lr_multiplier,
+            }
+        ]
+        rest_params = [
+            {
+                "params": self.image_proj.parameters(),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+            {
+                "params": self.text_proj.parameters(),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+            {
+                "params": self.norm_layer.parameters(),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+        ]
+        training_parameters = bert_params + backbone_params + rest_params
+
+        return training_parameters
+
+    def preprocess_text(self, sample_list) -> Tuple:
+        if hasattr(sample_list, "input_ids"):
+            text = transform_to_batch_sequence(sample_list.input_ids)
+            mask = transform_to_batch_sequence(sample_list.input_mask)
+            segment = transform_to_batch_sequence(sample_list.segment_ids)
+            return text, mask, segment
+        else:
+            return sample_list.text
+
+    def preprocess_image(self, sample_list) -> Tuple:
+        if self._is_direct_features_input:
+            return sample_list.image_feature_0.permute(0, 2, 1).unsqueeze(3)
+            # return shape is B x 2048 x 1 x 1
+        else:
+            if sample_list.image.dim() > 4:
+                sample_list.image = torch.flatten(sample_list.image, end_dim=-4)
+            return sample_list.image
+
+    def get_image_embeddings(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+        image_data = self.preprocess_image(sample_list)
+        image_feats = self.image_encoder(image_data)
+        image_feats = self.image_proj(image_feats)
+        return self.norm_layer(image_feats)
+
+    def get_text_embeddings(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+        text_data = self.preprocess_text(sample_list)
+        text_feats = self.text_encoder(text_data)
+        text_feats = self.text_proj(text_feats)
+        return self.norm_layer(text_feats)
+
+    def forward(self, sample_list):
+        image_proj = self.get_image_embeddings(sample_list)
+        text_proj = self.get_text_embeddings(sample_list)
+
+        output = {
+            "scores": image_proj,
+            "targets": text_proj,
+        }
+
+        return output
+
+
 @registry.register_model("cm_shared_transformer")
 class CMSharedTransformer(BaseAlign):
     def __init__(self, config: BaseAlign.Config):
@@ -113,7 +213,7 @@ class CMSharedTransformer(BaseAlign):
 
     @classmethod
     def config_path(cls):
-        return "configs/models/alignment/defaults.yaml"
+        return "configs/models/alignment/cm_shared_transformer.yaml"
 
     def build(self):
         self._is_direct_features_input = self.config.direct_features_input

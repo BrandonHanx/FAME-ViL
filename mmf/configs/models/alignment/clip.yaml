@@ -1,0 +1,23 @@
+model_config:
+  simple_alignment:
+    direct_features_input: false
+    lr_multiplier: 20
+
+    image_encoder:
+      type: clip_image_encoder
+      params:
+        name: RN50
+
+    text_encoder:
+      type: clip_text_encoder
+      params:
+        name: RN50
+
+    image_projection:
+      type: identity
+
+    text_projection:
+      type: identity
+
+    losses:
+    - type: contrastive_loss

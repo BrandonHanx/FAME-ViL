@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
+import clip
 import torch
 import torchvision
 from mmf.common.registry import registry
@@ -231,6 +232,8 @@ class ImageEncoderFactory(EncoderFactory):
             self.module = FRCNNImageEncoder(params)
         elif self._type == "vqvae_encoder":
             self.module = VQVAEEncoder(params)
+        elif self._type == "clip_image_encoder":
+            self.module = CLIPImageEncoder(params)
         else:
             raise NotImplementedError("Unknown Image Encoder: %s" % self._type)
 
@@ -344,6 +347,22 @@ class ResNet152ImageEncoder(Encoder):
         out = torch.flatten(out, start_dim=2)
         out = out.transpose(1, 2).contiguous()
         return out  # BxNx2048
+
+
+@registry.register_encoder("clip_image_encoder")
+class CLIPImageEncoder(Encoder):
+    @dataclass
+    class Config(Encoder.Config):
+        name: str = "RN50"
+
+    def __init__(self, config: Config, *args, **kwargs):
+        super().__init__()
+        self.config = config
+        model, _ = clip.load(self.config.name)
+        self.model = model.visual.float()
+
+    def forward(self, x):
+        return self.model(x)
 
 
 @registry.register_encoder("torchvision_resnet")
@@ -530,11 +549,43 @@ class TextEncoderFactory(EncoderFactory):
             self.module = self._module.module
         elif self._type == "embedding":
             self.module = TextEmbeddingEncoder(config.params)
+        elif self._type == "clip_text_encoder":
+            self.module = CLIPTextEncoder(config.params)
         else:
             raise NotImplementedError(f"Unknown Text Encoder {self._type}")
 
     def forward(self, *args, **kwargs):
         return self.module(*args, **kwargs)
+
+
+@registry.register_encoder("clip_text_encoder")
+class CLIPTextEncoder(Encoder):
+    @dataclass
+    class Config(Encoder.Config):
+        name: str = "RN50"
+
+    def __init__(self, config: Config, *args, **kwargs):
+        super().__init__()
+        self.config = config
+        model, _ = clip.load(self.config.name)
+        del model.visual
+        del model.logit_scale
+        self.model = model.float()
+
+    def forward(self, text):
+        # FIXME
+        text = clip.tokenize(text, truncate=True).to("cuda")
+        x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]
+        x = x + self.model.positional_embedding
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.model.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+        x = self.model.ln_final(x)
+        x = (
+            x[torch.arange(x.shape[0]), text.argmax(dim=-1)]
+            @ self.model.text_projection
+        )
+        return x
 
 
 @registry.register_encoder("text_embedding")
