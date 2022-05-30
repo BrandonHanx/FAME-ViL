@@ -1,6 +1,7 @@
 model_config:
   simple_alignment:
     direct_features_input: false
+    lr_multiplier: 1.0
 
     image_encoder:
       type: clip_image_encoder

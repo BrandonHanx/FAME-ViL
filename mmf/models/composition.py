@@ -53,6 +53,11 @@ class TIRG(nn.Module):
         return f
 
 
+class VectorAddition(nn.Module):
+    def forward(self, x, y):
+        return x + y
+
+
 class NormalizationLayer(nn.Module):
     """Class for normalization layer."""
 
@@ -132,6 +137,8 @@ class SimpleComposition(BaseComposition):
 
         if self.config.compositor.type == "tirg":
             self.compositor = TIRG(**self.config.compositor.params)
+        elif self.config.compositor.type == "va":
+            self.compositor = VectorAddition()
         else:
             raise NotImplementedError("Compositor not implemented")
 
