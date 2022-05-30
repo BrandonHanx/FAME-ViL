@@ -1,0 +1,72 @@
+# FashionGen data nums: 60147
+
+includes:
+- configs/models/alignment/clip.yaml
+
+model_config:
+  simple_alignment:
+    final_hidden_size: 512
+    direct_features_input: false
+    lr_multiplier: 20
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: 1
+    image_projection:
+      type: linear
+      params:
+        in_dim: 2048
+        out_dim: ${model_config.simple_alignment.final_hidden_size}
+    text_projection:
+      type: linear
+      params:
+        in_dim: 1024
+        out_dim: ${model_config.simple_alignment.final_hidden_size}
+
+
+dataset_config:
+  fashiongen:
+    processors:
+      text_processor:
+        type: copy_sentence
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 28170
+    - 56340
+    lr_ratio: 0.1
+    warmup_iterations: 939
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+  - r@k_general
+
+training:
+  experiment_name: res_clipbert_fashiongen
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 75120
+  log_interval: 10
+  checkpoint_interval: 939
+  evaluation_interval: 939
+  early_stop:
+    criteria: fashiongen/r@k_general/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_vall

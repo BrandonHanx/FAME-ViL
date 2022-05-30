@@ -444,7 +444,7 @@ class TorchvisionResNetImageEncoder(Encoder):
             out = out.transpose(1, 2).contiguous()  # BxNxout_dim
         else:
             out = torch.flatten(out, start_dim=1)  # BxN*out_dim
-        return out
+        return out.squeeze()
 
 
 @registry.register_encoder("detectron2_resnet")

@@ -3,11 +3,35 @@
 includes:
 - configs/models/alignment/clip.yaml
 
+model_config:
+  simple_alignment:
+    final_hidden_size: 512
+    direct_features_input: false
+    lr_multiplier: 20
+    text_encoder:
+      type: transformer
+      params:
+        bert_model_name: bert-base-uncased
+        hidden_size: 768
+        num_hidden_layers: 12
+        num_attention_heads: 12
+        output_attentions: false
+        output_hidden_states: false
+    image_projection:
+      type: linear
+      params:
+        in_dim: 1024
+        out_dim: ${model_config.simple_alignment.final_hidden_size}
+    text_projection:
+      type: linear
+      params:
+        in_dim: 768
+        out_dim: ${model_config.simple_alignment.final_hidden_size}
+
+
 dataset_config:
   fashiongen:
     processors:
-      text_processor:
-        type: copy_sentence
       train_image_processor:
         type: torchvision_transforms
         params:
@@ -63,7 +87,7 @@ evaluation:
   - r@k_general
 
 training:
-  experiment_name: clip_fashiongen
+  experiment_name: clipres_bert_fashiongen
   batch_size: 64
   lr_scheduler: true
   max_updates: 75120

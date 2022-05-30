@@ -187,7 +187,12 @@ class SimpleAlignment(BaseAlign):
 
     def get_text_embeddings(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
         text_data = self.preprocess_text(sample_list)
-        text_feats = self.text_encoder(text_data)
+        if isinstance(text_data, Tuple):
+            text_feats = self.text_encoder(*text_data)
+            text_feats = text_feats[0]
+            text_feats = text_feats[:, 0]  # [CLS]
+        else:
+            text_feats = self.text_encoder(text_data)
         text_feats = self.text_proj(text_feats)
         return self.norm_layer(text_feats)
 

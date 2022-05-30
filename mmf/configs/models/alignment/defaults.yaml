@@ -13,7 +13,6 @@ model_config:
         pool_type: avg
         num_output_features: -1
 
-
     text_encoder:
       type: transformer
       params:
@@ -37,7 +36,4 @@ model_config:
         out_dim: ${model_config.simple_alignment.final_hidden_size}
 
     losses:
-    - type: in_batch_hinge
-      params:
-        margin: 0.2
-        hard: true
+    - type: contrastive_loss
