@@ -3,6 +3,12 @@
 includes:
 - configs/models/composition/clip.yaml
 
+model_config:
+  simple_composition:
+    lr_multiplier: 10
+    compositor:
+      type: tirg
+
 dataset_config:
   fashioniq:
     processors:
@@ -38,7 +44,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 1e-5
+    lr: 1e-6
     eps: 1e-8
     weight_decay: 1e-4
 
@@ -47,7 +53,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: clip_fashioniq
+  experiment_name: clip_tirg_fashioniq
   batch_size: 32
   lr_scheduler: true
   max_updates: 44960

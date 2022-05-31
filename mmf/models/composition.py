@@ -150,14 +150,26 @@ class SimpleComposition(BaseComposition):
         backbone_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * self.config.lr_multiplier,
+                "lr": base_lr,
             }
         ]
         rest_params = [
-            {"params": filter_grads(self.image_proj.parameters()), "lr": base_lr},
-            {"params": filter_grads(self.text_proj.parameters()), "lr": base_lr},
-            {"params": filter_grads(self.compositor.parameters()), "lr": base_lr},
-            {"params": filter_grads(self.norm_layer.parameters()), "lr": base_lr},
+            {
+                "params": filter_grads(self.image_proj.parameters()),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+            {
+                "params": filter_grads(self.text_proj.parameters()),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+            {
+                "params": filter_grads(self.compositor.parameters()),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
+            {
+                "params": filter_grads(self.norm_layer.parameters()),
+                "lr": base_lr * self.config.lr_multiplier,
+            },
         ]
         training_parameters = bert_params + backbone_params + rest_params
 
