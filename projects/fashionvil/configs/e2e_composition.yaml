@@ -10,6 +10,7 @@ dataset_config:
 
 model_config:
   fashionvil:
+    comp_mode: va
     image_encoder:
       type: torchvision_resnet
       params:
@@ -18,12 +19,14 @@ model_config:
         zero_init_residual: false
         num_output_features: -1
         pool_type: avg
-    lr_multiplier: 20
+    # lr_multiplier: 20
     direct_features_input: false
     bert_model_name: bert-base-uncased
     training_head_type: composition
     bypass_transformer: true
     special_visual_initialize: false
+    losses:
+      - type: bbc_loss
 
 scheduler:
   type: multi_step
@@ -38,7 +41,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 1e-5
+    lr: 1e-6
     eps: 1e-8
     weight_decay: 1e-4
 
@@ -47,7 +50,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq_e2e_pretrain_final_128
+  experiment_name: fashionvil_composition_fashioniq_e2e_pretrain_final_va
   batch_size: 128
   lr_scheduler: true
   max_updates: 6000

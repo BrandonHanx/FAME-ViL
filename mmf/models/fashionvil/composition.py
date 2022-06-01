@@ -11,6 +11,7 @@ from torch import Tensor
 class FashionViLForComposition(FashionViLBaseModel):
     def __init__(self, config):
         super().__init__(config)
+        self.comp_mode = config.get("comp_mode", "heavy")
         self.norm_layer = NormalizationLayer()
 
     def add_post_flatten_params(
@@ -47,15 +48,37 @@ class FashionViLForComposition(FashionViLBaseModel):
         tar_embeddings = tar_embeddings.mean(dim=1)
         tar_embeddings = self.norm_layer(tar_embeddings)
 
-        comp_embeddings, _, _ = self.bert.get_joint_embedding(
-            sample_list["input_ids"],
-            sample_list["segment_ids"],
-            sample_list["ref_image"],
-            sample_list["ref_visual_embeddings_type"],
-            sample_list["comp_attention_mask"],
-        )
-        num_visual_tokens = sample_list["tar_image"].shape[1]
-        comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        if self.comp_mode == "heavy":
+            comp_embeddings, _, _ = self.bert.get_joint_embedding(
+                sample_list["input_ids"],
+                sample_list["segment_ids"],
+                sample_list["ref_image"],
+                sample_list["ref_visual_embeddings_type"],
+                sample_list["comp_attention_mask"],
+            )
+            num_visual_tokens = sample_list["tar_image"].shape[1]
+            comp_embeddings = comp_embeddings[:, -num_visual_tokens:].mean(dim=1)
+        elif self.comp_mode == "va":
+            ref_embeddings, _, _ = self.bert.get_image_embedding(
+                sample_list["ref_image"],
+                sample_list["ref_visual_embeddings_type"],
+                sample_list["visual_attention_mask"],
+            )
+            ref_embeddings = ref_embeddings.mean(dim=1)
+            text_embeddings, _, _ = self.bert.get_text_embedding(
+                sample_list["input_ids"],
+                sample_list["segment_ids"],
+                sample_list["input_mask"],
+            )
+            # text_embeddings = text_embeddings[:, 0]
+            masks = sample_list["input_mask"]
+            text_embeddings = text_embeddings * masks.unsqueeze(2)
+            text_embeddings = torch.sum(text_embeddings, dim=1) / (
+                torch.sum(masks, dim=1, keepdim=True)
+            )
+            comp_embeddings = text_embeddings + ref_embeddings
+        else:
+            raise NotImplementedError
         comp_embeddings = self.norm_layer(comp_embeddings)
 
         output_dict = {
