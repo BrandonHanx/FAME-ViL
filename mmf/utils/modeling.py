@@ -29,6 +29,8 @@ def get_fashionvil_configured_parameters(
     optimizer_grouped_parameters = []
 
     for n, p in param_optimizer:
+        if not p.requires_grad:
+            continue
         param_dict = {}
         param_dict["params"] = [p]
         if not any(nd in n for nd in lr_filter):

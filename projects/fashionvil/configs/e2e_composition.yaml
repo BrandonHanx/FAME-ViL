@@ -24,8 +24,6 @@ model_config:
     training_head_type: composition
     bypass_transformer: true
     special_visual_initialize: false
-    losses:
-      - type: contrastive_loss
 
 scheduler:
   type: multi_step
@@ -56,6 +54,7 @@ training:
   log_interval: 10
   checkpoint_interval: 5620
   evaluation_interval: 562
+  find_unused_parameters: true
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
