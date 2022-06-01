@@ -127,6 +127,7 @@ class SimpleComposition(BaseComposition):
         self.image_encoder = build_image_encoder(
             self.config.image_encoder, self._is_direct_features_input
         )
+        self.freeze_bn(self.image_encoder)
 
         # Projectors
         image_proj_config = deepcopy(self.config.image_projection)
@@ -143,6 +144,16 @@ class SimpleComposition(BaseComposition):
             raise NotImplementedError("Compositor not implemented")
 
         self.norm_layer = NormalizationLayer(**self.config.norm_layer)
+
+    @staticmethod
+    def freeze_bn(model):
+        for module in model.modules():
+            if isinstance(module, torch.nn.BatchNorm2d):
+                if hasattr(module, "weight"):
+                    module.weight.requires_grad_(False)
+                if hasattr(module, "bias"):
+                    module.bias.requires_grad_(False)
+                module.eval()
 
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
