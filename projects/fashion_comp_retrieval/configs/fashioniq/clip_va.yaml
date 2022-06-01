@@ -8,7 +8,7 @@ model_config:
     compositor:
       type: va
     losses:
-      type: contrastive_loss
+    - type: contrastive_loss
 
 dataset_config:
   fashioniq:

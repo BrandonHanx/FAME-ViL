@@ -23,16 +23,16 @@ model_config:
     bert_model_name: bert-base-uncased
     training_head_type: composition
     bypass_transformer: true
+    special_visual_initialize: false
     losses:
-      - type: bbc_loss
+      - type: contrastive_loss
 
 scheduler:
   type: multi_step
   params:
-    use_warmup: true
+    use_warmup: false
     lr_steps:
-    - 16860
-    - 28100
+    - 4000
     lr_ratio: 0.1
     warmup_iterations: 2810
     warmup_factor: 0.25
@@ -49,10 +49,10 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionvil_composition_fashioniq_e2e_pretrain_baseline
-  batch_size: 32
+  experiment_name: fashionvil_composition_fashioniq_e2e_pretrain_final_128
+  batch_size: 128
   lr_scheduler: true
-  max_updates: 44960
+  max_updates: 6000
   log_interval: 10
   checkpoint_interval: 5620
   evaluation_interval: 562
@@ -66,7 +66,7 @@ run_type: train_val
 
 checkpoint:
   resume_pretrained: true
-  resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
+  resume_file: save/backup_ckpts/fashionvil_final.pth
   pretrained_state_mapping:
     image_encoder: image_encoder
     model.bert: model.bert
