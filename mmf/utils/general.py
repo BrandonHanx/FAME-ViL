@@ -311,6 +311,10 @@ def print_model_parameters(model, return_only=False):
     total_params = sum(p.numel() for p in model.parameters())
     trained_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+    # for n, p in model.named_parameters():
+    #     if p.requires_grad:
+    #         print(n, p.numel())
+
     if not return_only:
         logger.info(
             f"Total Parameters: {total_params}. Trained Parameters: {trained_params}"
