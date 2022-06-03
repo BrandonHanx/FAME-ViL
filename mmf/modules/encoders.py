@@ -357,11 +357,15 @@ class CLIPImageEncoder(Encoder):
         freeze: bool = False
         adapter_name: str = None
         prompt_length: int = 10
+        bottleneck: int = 64
+        dropout: float = 0.0
 
     def __init__(self, config: Config, *args, **kwargs):
         super().__init__()
         self.config = config
-        model, _ = clip.load(self.config.name, self.config)
+        model, _ = clip.load(
+            self.config.name, config if config.get("adapter_name") else None
+        )
         self.model = model.visual.float()
 
     def forward(self, x):
@@ -569,11 +573,15 @@ class CLIPTextEncoder(Encoder):
         freeze: bool = False
         adapter_name: str = None
         prompt_length: int = 10
+        bottleneck: int = 64
+        dropout: float = 0.0
 
     def __init__(self, config: Config, *args, **kwargs):
         super().__init__()
         self.config = config
-        model, _ = clip.load(self.config.name, self.config)
+        model, _ = clip.load(
+            self.config.name, config if config.get("adapter_name") else None
+        )
         del model.visual
         del model.logit_scale
         self.model = model.float()

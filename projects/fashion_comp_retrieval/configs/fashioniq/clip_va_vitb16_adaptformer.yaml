@@ -10,15 +10,17 @@ model_config:
       params:
         name: ViT-B/16
         freeze: true
-        adapter_name: prompt_tuning
-        prompt_length: 10
+        adapter_name: adaptformer
+        bottleneck: 64
+        dropout: 0
     text_encoder:
       type: clip_text_encoder
       params:
         name: ViT-B/16
         freeze: true
-        adapter_name: prompt_tuning
-        prompt_length: 10
+        adapter_name: adaptformer
+        bottleneck: 64
+        dropout: 0
     compositor:
       type: va
 
@@ -80,7 +82,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: clip_va_fashioniq_vitb16_pt
+  experiment_name: clip_va_fashioniq_vitb16_adaptformer
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
