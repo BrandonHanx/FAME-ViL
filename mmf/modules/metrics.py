@@ -1569,8 +1569,8 @@ class RecallAtK_fashioniq(BaseMetric):
     def __init__(self, name="recall@k_fashioniq"):
         super().__init__(name)
         self.required_params = [
-            "scores",
-            "targets",
+            "comp_feats",
+            "tar_feats",
             "target_id",
             "fake_data",
             "garment_class",
@@ -1624,8 +1624,8 @@ class RecallAtK_fashioniq(BaseMetric):
         *args,
         **kwargs,
     ):
-        comp_embeddings = model_output["scores"]
-        tar_embeddings = model_output["targets"]
+        comp_embeddings = model_output["comp_feats"]
+        tar_embeddings = model_output["tar_feats"]
         target_ids = sample_list["target_id"]
         fake_data = sample_list["fake_data"]
         garment_class = sample_list["garment_class"]

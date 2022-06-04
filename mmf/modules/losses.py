@@ -783,9 +783,14 @@ class TripletLoss(nn.Module):
 
 @registry.register_loss("bbc_loss")
 class BatchBasedClassificationLoss(nn.Module):
+    def __init__(self, score_key, target_key):
+        super().__init__()
+        self.score_key = score_key
+        self.target_key = target_key
+
     def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
-        ref_features = model_output["scores"]
-        tar_features = model_output["targets"]
+        ref_features = model_output[self.score_key]
+        tar_features = model_output[self.target_key]
 
         per_gpu_batch_size = ref_features.size(0)
         device = ref_features.device

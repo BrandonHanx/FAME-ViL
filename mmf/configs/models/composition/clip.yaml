@@ -32,3 +32,6 @@ model_config:
 
     losses:
     - type: bbc_loss
+      params:
+        score_key: comp_feats
+        target_key: tar_feats

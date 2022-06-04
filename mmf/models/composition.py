@@ -58,6 +58,11 @@ class VectorAddition(nn.Module):
         return x + y
 
 
+class VectorSubtraction(nn.Module):
+    def forward(self, x, y):
+        return x - y
+
+
 class NormalizationLayer(nn.Module):
     """Class for normalization layer."""
 
@@ -79,6 +84,7 @@ class BaseComposition(BaseModel):
         image_encoder: Any = MISSING
         text_encoder: Any = MISSING
         compositor: Any = MISSING
+        decomposor: Any = MISSING
         norm_layer: Any = MISSING
         image_projection: Any = IdentityEncoder.Config()
         text_projection: Any = IdentityEncoder.Config()
@@ -142,6 +148,11 @@ class SimpleComposition(BaseComposition):
         else:
             raise NotImplementedError("Compositor not implemented")
 
+        if self.config.decomposor.type == "vs":
+            self.decomposor = VectorSubtraction()
+        else:
+            self.decomposor = None
+
         self.norm_layer = NormalizationLayer(**self.config.norm_layer)
 
     def get_optimizer_parameters(self, config):
@@ -194,15 +205,23 @@ class SimpleComposition(BaseComposition):
         image_feats = self.image_proj(image_feats)
         return image_feats
 
-    def get_ref_image_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_ref_image_embedding(
+        self, sample_list, norm=False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         ref_image = self.preprocess_image(sample_list.ref_image)
-        return self._get_image_embedding(ref_image)
+        ref_image = self._get_image_embedding(ref_image)
+        return self.norm_layer(ref_image) if norm else ref_image
 
-    def get_tar_image_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_tar_image_embedding(
+        self, sample_list, norm=True
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         tar_image = self.preprocess_image(sample_list.tar_image)
-        return self.norm_layer(self._get_image_embedding(tar_image))
+        tar_image = self._get_image_embedding(tar_image)
+        return self.norm_layer(tar_image) if norm else tar_image
 
-    def get_text_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_text_embedding(
+        self, sample_list, norm=False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         text_data = self.preprocess_text(sample_list)
 
         text_enc = self.text_encoder(text_data)
@@ -214,23 +233,37 @@ class SimpleComposition(BaseComposition):
             text_proj = torch.sum(text_proj, dim=1) / (
                 torch.sum(masks, dim=1, keepdim=True)
             )
-            return text_proj
+            return self.norm_layer(text_proj) if norm else text_proj
         else:
-            return text_enc
+            return self.norm_layer(text_enc) if norm else text_enc
 
-    def get_comp_embedding(self, sample_list) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_comp_embedding(
+        self, sample_list, norm=True
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         ref_img_ebd = self.get_ref_image_embedding(sample_list)
         text_ebd = self.get_text_embedding(sample_list)
         comp_ebd = self.compositor(ref_img_ebd, text_ebd)
-        return self.norm_layer(comp_ebd)
+        return self.norm_layer(comp_ebd) if norm else comp_ebd
 
     def forward(self, sample_list):
-        comp_ebd = self.get_comp_embedding(sample_list)
-        tar_ebd = self.get_tar_image_embedding(sample_list)
-
-        output = {
-            "scores": comp_ebd,
-            "targets": tar_ebd,
-        }
-
-        return output
+        if self.decomposor is None:
+            comp_feats = self.get_comp_embedding(sample_list)
+            tar_feats = self.get_tar_image_embedding(sample_list)
+            output = {
+                "comp_feats": comp_feats,
+                "tar_feats": tar_feats,
+            }
+            return output
+        else:
+            tar_feats = self.get_tar_image_embedding(sample_list)
+            ref_feats = self.get_ref_image_embedding(sample_list)
+            text_feats = self.get_text_embedding(sample_list)
+            comp_feats = self.compositor(ref_feats, text_feats)
+            deco_feats = self.decomposor(tar_feats, ref_feats)
+            output = {
+                "comp_feats": self.norm_layer(comp_feats),
+                "tar_feats": self.norm_layer(tar_feats),
+                "deco_feats": self.norm_layer(deco_feats),
+                "text_feats": self.norm_layer(text_feats),
+            }
+            return output
