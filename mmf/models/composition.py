@@ -148,8 +148,9 @@ class SimpleComposition(BaseComposition):
         else:
             raise NotImplementedError("Compositor not implemented")
 
-        if self.config.decomposor.type == "vs":
-            self.decomposor = VectorSubtraction()
+        if hasattr(self.config, "decomposor"):
+            if self.config.decomposor.type == "vs":
+                self.decomposor = VectorSubtraction()
         else:
             self.decomposor = None
 
