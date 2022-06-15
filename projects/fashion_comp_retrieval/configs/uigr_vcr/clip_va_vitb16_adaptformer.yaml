@@ -1,4 +1,4 @@
-# UIGR TGR data nums: 210,189
+# UIGR TGR data nums: 190,150
 
 includes:
 - configs/models/composition/clip.yaml
@@ -25,7 +25,7 @@ model_config:
       type: va
 
 dataset_config:
-  uigr_tgr:
+  uigr_vcr:
     processors:
       text_processor:
         type: copy_sentence
@@ -83,7 +83,7 @@ evaluation:
     - r@50_comp
 
 training:
-  experiment_name: clip_va_uigrtgr_vitb16_adaptformer
+  experiment_name: clip_va_uigrvcr_vitb16_adaptformer
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
@@ -91,7 +91,7 @@ training:
   checkpoint_interval: 500
   evaluation_interval: 500
   early_stop:
-    criteria: uigr_tgr/r@10_comp
+    criteria: uigr_vcr/r@10_comp
     minimize: false
   wandb:
     enabled: true
