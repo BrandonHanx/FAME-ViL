@@ -1,0 +1,64 @@
+dataset_config:
+  uigr_vcr:
+      data_dir: ${env.data_dir}/datasets
+      use_images: true
+      use_features: false
+      task_type: outfit
+      images:
+        train:
+        - UIGR/images
+        val:
+        - UIGR/images
+        test:
+        - UIGR/images
+      annotations:
+        train:
+        - UIGR
+        val:
+        - UIGR
+        test:
+        - UIGR
+      features:
+        train:
+        - UIGR/features
+        val:
+        - UIGR/features
+        test:
+        - UIGR/features
+      processors:
+        text_processor:
+          type: bert_tokenizer
+          params:
+            tokenizer_config:
+              type: bert-base-uncased
+              params:
+                do_lower_case: true
+            mask_probability: 0
+            max_seq_length: 50
+        train_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: RandomResizedCrop
+                params:
+                  size: [224, 224]
+                  scale: [0.8, 1.0]
+                  ratio: [0.75, 1.3]
+              - RandomHorizontalFlip
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]
+        eval_image_processor:
+          type: torchvision_transforms
+          params:
+            transforms:
+              - type: Resize
+                params:
+                  size: [224, 224]
+              - ToTensor
+              - type: Normalize
+                params:
+                  mean: [0.46777044, 0.44531429, 0.40661017]
+                  std: [0.12221994, 0.12145835, 0.14380469]
