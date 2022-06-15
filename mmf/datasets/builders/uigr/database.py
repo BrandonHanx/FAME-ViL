@@ -22,15 +22,26 @@ class UIGRDatabase(torch.utils.data.Dataset):
         with PathManager.open(os.path.join(splits_path, json_name), "r") as f:
             annotations_json = json.load(f)
 
-        for item in annotations_json:
-            data.append(
-                {
-                    "ref_path": item["candidate"],
-                    "tar_path": item["target"],
-                    "sentences": ", ".join(item["captions"]),
-                    "fake_data": False,
-                }
-            )
+        if self.splits == "train":
+            for item in annotations_json:
+                data.append(
+                    {
+                        "ref_path": item["candidate"],
+                        "tar_path": item["target"],
+                        "sentences": ", ".join(item["captions"]),
+                    }
+                )
+        else:
+            for item in annotations_json:
+                data.append(
+                    {
+                        "ref_path": item["candidate"],
+                        "tar_path": item["target"],
+                        "sentences": ", ".join(item["captions"]),
+                        "target_id": item["target_id"],
+                        "fake_data": item["fake_data"],
+                    }
+                )
 
         if len(data) == 0:
             raise RuntimeError("Dataset is empty")
