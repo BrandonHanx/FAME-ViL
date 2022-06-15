@@ -72,8 +72,8 @@ class CSANet(BaseModel):
     def build(self):
         self.image_encoder = build_image_encoder(self.config.image_encoder)
         # Set block fixed
-        for p in self.image_encoder.model[-1].parameters():
-            p.requires_grad = False
+        # for p in self.image_encoder.model[-1].parameters():
+        #     p.requires_grad = False
         self.image_encoder.apply(self.set_bn_eval)
         self.image_encoder.apply(self.set_bn_no_grad)
         self.proj_layer = nn.Linear(self.config.image_channel, self.config.feature_dim)
