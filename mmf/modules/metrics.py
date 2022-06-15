@@ -1221,7 +1221,7 @@ class RecallAtK_ret(BaseMetric):
 class RecallAtK_comp(BaseMetric):
     def __init__(self, name="recall@k_comp"):
         super().__init__(name)
-        self.required_params = ["scores", "targets", "target_id", "fake_data"]
+        self.required_params = ["comp_feats", "tar_feats", "target_id", "fake_data"]
 
     def calculate(
         self,
@@ -1231,8 +1231,8 @@ class RecallAtK_comp(BaseMetric):
         *args,
         **kwargs,
     ):
-        comp_embeddings = model_output["scores"]
-        tar_embeddings = model_output["targets"]
+        comp_embeddings = model_output["comp_feats"]
+        tar_embeddings = model_output["tar_feats"]
         target_ids = sample_list["target_id"]
         fake_data = sample_list["fake_data"]
 

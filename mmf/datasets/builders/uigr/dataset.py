@@ -64,4 +64,8 @@ class UIGRDataset(MMFDataset):
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
         current_sample.targets = None  # Dummy for Loss
 
+        if "fake_data" in sample_info:
+            current_sample.target_id = torch.tensor(sample_info['target_id'], dtype=torch.long)
+            current_sample.fake_data = torch.tensor(sample_info["fake_data"], dtype=torch.bool)
+
         return current_sample
