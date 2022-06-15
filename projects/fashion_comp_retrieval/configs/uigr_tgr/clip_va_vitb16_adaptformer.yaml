@@ -91,7 +91,7 @@ training:
   checkpoint_interval: 500
   evaluation_interval: 500
   early_stop:
-    criteria: uigr_tgr/r@10_comp
+    criteria: uigr/r@10_comp
     minimize: false
   wandb:
     enabled: true
