@@ -82,7 +82,7 @@ class FashionViLForComposition(FashionViLBaseModel):
         comp_embeddings = self.norm_layer(comp_embeddings)
 
         output_dict = {
-            "scores": comp_embeddings,
-            "targets": tar_embeddings,
+            "comp_feats": comp_embeddings,
+            "tar_feats": tar_embeddings,
         }
         return output_dict

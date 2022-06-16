@@ -1,0 +1,75 @@
+# UIGR TGR data nums: 190,150
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  fashioniq:
+    use_images: true
+    use_features: false
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+    lr_multiplier: 20
+    direct_features_input: false
+    bert_model_name: bert-base-uncased
+    training_head_type: composition
+    bypass_transformer: true
+    special_visual_initialize: false
+    losses:
+      - type: bbc_loss
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 30000
+    - 40000
+    lr_ratio: 0.1
+    warmup_iterations: 5000
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+    - r@10_comp
+    - r@50_comp
+
+training:
+  experiment_name: fashionvil_composition_uigr_vcr_e2e_pretrain_final
+  batch_size: 32
+  lr_scheduler: true
+  max_updates: 50000
+  log_interval: 10
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  find_unused_parameters: true
+  early_stop:
+    criteria: uigr/r@10_comp
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
+
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/backup_ckpts/fashionvil_final.pth
+  pretrained_state_mapping:
+    image_encoder: image_encoder
+    model.bert: model.bert
