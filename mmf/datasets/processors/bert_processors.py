@@ -8,7 +8,25 @@ import torch
 from mmf.common.registry import registry
 from mmf.common.sample import Sample, SampleList
 from mmf.datasets.processors.processors import BaseProcessor
+from transformers import CLIPTokenizer
 from transformers.tokenization_auto import AutoTokenizer
+
+
+@registry.register_processor("clip_tokenizer")
+class CLIPTokenProcessor(BaseProcessor):
+    def __init__(self, config, *args, **kwargs):
+
+        tokenizer_config = config.tokenizer_config
+        self._tokenizer = CLIPTokenizer.from_pretrained(
+            tokenizer_config.type, **tokenizer_config.params
+        )
+
+    def __call__(self, item: Dict[str, Any]):
+        data = self._tokenizer(
+            [item["text"]], padding="max_length", return_tensors="pt"
+        )
+        data["text"] = item["text"]
+        return data
 
 
 @registry.register_processor("masked_token")
