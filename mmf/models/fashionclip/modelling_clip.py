@@ -116,7 +116,7 @@ class CLIPCrossAttention(nn.Module):
         self.value = nn.Linear(ctx_dim, self.head_size)
 
         self.dropout = nn.Dropout(config.attention_dropout)
-        self.scale = nn.Parameter(torch.ones(1))
+        self.scale = nn.Parameter(torch.zeros(1))
         self.query_layernorm = nn.LayerNorm(config.hidden_size)
         self.context_layernorm = nn.LayerNorm(ctx_dim)
 
