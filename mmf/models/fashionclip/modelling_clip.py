@@ -361,6 +361,7 @@ class CLIPModelWithAdapter(CLIPModel):
 
         text_config = config.text_config
         vision_config = config.vision_config
+        self.adapter_config = adapter_config
 
         self.projection_dim = config.projection_dim
         self.text_embed_dim = text_config.hidden_size
