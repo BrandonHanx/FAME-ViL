@@ -210,7 +210,8 @@ class CLIPVisionTransformerWithAdapter(CLIPVisionTransformer):
         self.config = config
         embed_dim = config.hidden_size
         self.embeddings = CLIPVisionEmbeddings(config)
-        self.pre_layernorm = nn.LayerNorm(embed_dim)
+        # Typo of huggingface
+        self.pre_layrnorm = nn.LayerNorm(embed_dim)
         self.encoder = CLIPEncoderWithAdapter(config, adapter_config)
         self.post_layernorm = nn.LayerNorm(embed_dim)
 
@@ -225,7 +226,7 @@ class CLIPVisionTransformerWithAdapter(CLIPVisionTransformer):
 
     def freeze(self):
         self._freeze(self.embeddings)
-        self._freeze(self.pre_layernorm)
+        self._freeze(self.pre_layrnorm)
         self._freeze(self.post_layernorm)
 
 
@@ -275,4 +276,4 @@ class CLIPModelWithAdapter(CLIPModel):
     def freeze(self):
         self._freeze(self.visual_projection)
         self._freeze(self.text_projection)
-        self.text_projection.requires_grad = False
+        self.logit_scale.requires_grad = False
