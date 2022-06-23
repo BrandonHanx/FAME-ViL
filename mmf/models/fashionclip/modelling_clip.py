@@ -18,6 +18,7 @@ from transformers.modeling_clip import (
     CLIPVisionEmbeddings,
     CLIPTextEmbeddings,
     CLIPModel,
+    _expand_mask,
 )
 
 
@@ -29,11 +30,13 @@ class CLIPAdapterConfig:
         adapter_name: str = None,
         bottleneck: int = 64,
         dropout: float = 0.0,
+        enable_xattn: bool = False,
     ):
         self.freeze = freeze
         self.adapter_name = adapter_name
         self.bottleneck = bottleneck
         self.dropout = dropout
+        self.enable_xattn = enable_xattn
 
 
 class Adapter(nn.Module):
@@ -95,6 +98,76 @@ class Adapter(nn.Module):
         return output
 
 
+class CLIPCrossAttention(nn.Module):
+    def __init__(self, config, ctx_dim=None):
+        super().__init__()
+        assert config.hidden_size % config.num_attention_heads == 0
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
+        self.head_size = self.num_attention_heads * self.attention_head_size
+
+        if ctx_dim is None:
+            ctx_dim = config.hidden_size
+        self.query = nn.Linear(config.hidden_size, self.head_size)
+        self.key = nn.Linear(ctx_dim, self.head_size)
+        self.value = nn.Linear(ctx_dim, self.head_size)
+
+        self.dropout = nn.Dropout(config.attention_dropout)
+        self.scale = nn.Parameter(torch.ones(1))
+        self.query_layernorm = nn.LayerNorm(config.hidden_size)
+        self.context_layernorm = nn.LayerNorm(ctx_dim)
+
+    def transpose_for_scores(self, x):
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
+        x = x.view(new_x_shape)
+        return x.permute(0, 2, 1, 3)
+
+    def forward(
+        self, hidden_states, context, attention_mask=None, output_attentions=False
+    ):
+        # FIXME: maybe we need two LN here
+        hidden_states = self.query_layernorm(hidden_states)
+        context = self.context_layernorm(context)
+        mixed_query_layer = self.query(hidden_states)
+        mixed_key_layer = self.key(context)
+        mixed_value_layer = self.value(context)
+
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
+
+        # Take the dot product between "query" and "key"
+        # to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Apply the attention mask is
+        # (precomputed for all layers in BertModel forward() function)
+        if attention_mask is not None:
+            attention_scores = attention_scores + attention_mask
+
+        # Normalize the attention scores to probabilities.
+        attention_probs = F.softmax(attention_scores, dim=-1)
+
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.dropout(attention_probs)
+
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.head_size,)
+        context_layer = context_layer.view(new_context_layer_shape) * self.scale
+
+        outputs = (
+            (context_layer, attention_probs)
+            if output_attentions
+            else (context_layer, None)
+        )
+        return outputs
+
+
 class CLIPEncoderLayerWithAdapter(nn.Module):
     def __init__(self, config: CLIPConfig, adapter_config: CLIPAdapterConfig = None):
         super().__init__()
@@ -114,6 +187,11 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     self.adapter_config.bottleneck,
                     self.adapter_config.dropout,
                 )
+            if self.adapter_config.enable_xattn:
+                # FIXME: monkey patching
+                self.cross_attn = CLIPCrossAttention(
+                    config, 768 if config.hidden_size == 512 else 512
+                )
 
     @staticmethod
     def _freeze(module):
@@ -126,6 +204,55 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         self._freeze(self.mlp)
         self._freeze(self.layer_norm2)
 
+    def forward_self_attn(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        causal_attention_mask: Optional[torch.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+    ) -> Tuple[torch.FloatTensor]:
+        hidden_states = self.layer_norm1(hidden_states)
+        hidden_states, attn_weights = self.self_attn(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            causal_attention_mask=causal_attention_mask,
+            output_attentions=output_attentions,
+        )
+        return hidden_states, attn_weights
+
+    def forward_cross_attn(
+        self,
+        hidden_states: torch.Tensor,
+        context: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+    ) -> Tuple[torch.FloatTensor]:
+        hidden_states, attn_weights = self.cross_attn(
+            hidden_states=hidden_states,
+            context=context,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+        )
+        return hidden_states, attn_weights
+
+    def forward_originmlp(self, hidden_states: torch.Tensor) -> torch.FloatTensor:
+        hidden_states = self.layer_norm2(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        return hidden_states
+
+    def forward_adaptmlp(self, hidden_states: torch.Tensor) -> torch.FloatTensor:
+        adapt_hidden_states = self.adapt_mlp(hidden_states, add_residual=False)
+        hidden_states = self.layer_norm2(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        return hidden_states + adapt_hidden_states
+
+    def forward_mlp(self, hidden_states: torch.Tensor) -> torch.FloatTensor:
+        if self.adapter_config is None:
+            hidden_states = self.forward_originmlp(hidden_states)
+        else:
+            hidden_states = self.forward_adaptmlp(hidden_states)
+        return hidden_states
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -136,25 +263,16 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
 
         residual = hidden_states
 
-        hidden_states = self.layer_norm1(hidden_states)
-        hidden_states, attn_weights = self.self_attn(
-            hidden_states=hidden_states,
-            attention_mask=attention_mask,
-            causal_attention_mask=causal_attention_mask,
-            output_attentions=output_attentions,
+        hidden_states, attn_weights = self.forward_self_attn(
+            hidden_states, attention_mask, causal_attention_mask, output_attentions
         )
-        hidden_states = residual + hidden_states
 
+        hidden_states = hidden_states + residual
         residual = hidden_states
-        if self.adapter_config is None:
-            hidden_states = self.layer_norm2(hidden_states)
-            hidden_states = self.mlp(hidden_states)
-            hidden_states = residual + hidden_states
-        else:
-            adapt_hidden_states = self.adapt_mlp(hidden_states, add_residual=False)
-            hidden_states = self.layer_norm2(hidden_states)
-            hidden_states = self.mlp(hidden_states)
-            hidden_states = residual + hidden_states + adapt_hidden_states
+
+        hidden_states = self.forward_mlp(hidden_states)
+
+        hidden_states = hidden_states + residual
 
         outputs = (hidden_states,)
 
@@ -277,3 +395,70 @@ class CLIPModelWithAdapter(CLIPModel):
         self._freeze(self.visual_projection)
         self._freeze(self.text_projection)
         self.logit_scale.requires_grad = False
+
+    def get_cross_attn_features(
+        self,
+        pixel_values: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        # output_attentions: Optional[bool] = None,
+    ) -> torch.FloatTensor:
+
+        v_hidden_states = self.vision_model.embeddings(pixel_values)
+        v_hidden_states = self.vision_model.pre_layrnorm(v_hidden_states)
+
+        input_shape = input_ids.size()
+        input_ids = input_ids.view(-1, input_shape[-1])
+
+        t_hidden_states = self.text_model.embeddings(
+            input_ids=input_ids, position_ids=position_ids
+        )
+        bsz, seq_len = input_shape
+        causal_attention_mask = self.text_model._build_causal_attention_mask(
+            bsz, seq_len
+        ).to(t_hidden_states.device)
+        if attention_mask is not None:
+            self_attn_mask = _expand_mask(attention_mask, t_hidden_states.dtype)
+            cross_attn_mask = _expand_mask(
+                attention_mask, t_hidden_states.dtype, v_hidden_states.shape[1]
+            )
+
+        for v_layer, t_layer in zip(
+            self.vision_model.encoder.layers, self.text_model.encoder.layers
+        ):
+            v_residual = v_hidden_states
+            t_residual = t_hidden_states
+            v_hidden_states, _ = v_layer.forward_self_attn(v_hidden_states)
+            t_hidden_states, _ = t_layer.forward_self_attn(
+                t_hidden_states, self_attn_mask, causal_attention_mask
+            )
+
+            vt_hidden_states, _ = v_layer.forward_cross_attn(
+                v_hidden_states, t_hidden_states, cross_attn_mask
+            )
+            tv_hidden_states, _ = t_layer.forward_cross_attn(
+                t_hidden_states, v_hidden_states
+            )
+
+            v_hidden_states = v_residual + v_hidden_states + vt_hidden_states
+            t_hidden_states = t_residual + t_hidden_states + tv_hidden_states
+            v_residual = v_hidden_states
+            t_residual = t_hidden_states
+
+            v_hidden_states = v_layer.forward_mlp(v_hidden_states)
+            t_hidden_states = t_layer.forward_mlp(t_hidden_states)
+            v_hidden_states = v_residual + v_hidden_states
+            t_hidden_states = t_residual + t_hidden_states
+
+        v_features = v_hidden_states[:, 0, :]
+        v_features = self.vision_model.post_layernorm(v_features)
+        v_features = self.visual_projection(v_features)
+
+        t_hidden_states = self.text_model.final_layer_norm(t_hidden_states)
+        t_features = t_hidden_states[
+            torch.arange(t_hidden_states.shape[0]), input_ids.argmax(dim=-1)
+        ]
+        t_features = self.text_projection(t_features)
+
+        return v_features, t_features

@@ -13,6 +13,7 @@ class FashionCLIPForComposition(FashionCLIPBaseModel):
         super().__init__(config, adapter_config)
         self.comp_mode = config.get("comp_mode", "va")
         self.norm_layer = NormalizationLayer()
+        self.enable_xattn = adapter_config.enable_xattn
         if self.comp_mode == "va":
             self.compositor = VectorAddition()
         else:
@@ -28,11 +29,18 @@ class FashionCLIPForComposition(FashionCLIPBaseModel):
         tar_embeddings = self.clip.get_image_features(sample_list.tar_image)
         tar_embeddings = self.norm_layer(tar_embeddings)
 
-        ref_embeddings = self.clip.get_image_features(sample_list.ref_image)
-        text_embeddings = self.clip.get_text_features(
-            sample_list.input_ids, sample_list.attention_mask
-        )
-        comp_embeddings = self.compositor(ref_embeddings, text_embeddings)
+        if self.enable_xattn:
+            comp_embeddings, _ = self.clip.get_cross_attn_features(
+                pixel_values=sample_list.ref_image,
+                input_ids=sample_list.input_ids,
+                attention_mask=sample_list.attention_mask,
+            )
+        else:
+            ref_embeddings = self.clip.get_image_features(sample_list.ref_image)
+            text_embeddings = self.clip.get_text_features(
+                sample_list.input_ids, sample_list.attention_mask
+            )
+            comp_embeddings = self.compositor(ref_embeddings, text_embeddings)
         comp_embeddings = self.norm_layer(comp_embeddings)
 
         output_dict = {

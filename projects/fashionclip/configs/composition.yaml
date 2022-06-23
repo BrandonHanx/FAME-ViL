@@ -10,6 +10,7 @@ model_config:
       adapter_name: scaled_pa
       bottleneck: 64
       dropout: 0.0
+      enable_xattn: true
     losses:
       - type: bbc_loss
 
@@ -74,7 +75,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition
+  experiment_name: fashionclip_fashioniq_composition_cross
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
