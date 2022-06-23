@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
 import math
+import random
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -31,12 +32,14 @@ class CLIPAdapterConfig:
         bottleneck: int = 64,
         dropout: float = 0.0,
         enable_xattn: bool = False,
+        cross_dropout: float = 0.0,
     ):
         self.freeze = freeze
         self.adapter_name = adapter_name
         self.bottleneck = bottleneck
         self.dropout = dropout
         self.enable_xattn = enable_xattn
+        self.cross_dropout = cross_dropout
 
 
 class Adapter(nn.Module):
@@ -423,8 +426,8 @@ class CLIPModelWithAdapter(CLIPModel):
                 attention_mask, t_hidden_states.dtype, v_hidden_states.shape[1]
             )
 
-        for i, v_layer, t_layer in enumerate(
-            zip(self.vision_model.encoder.layers, self.text_model.encoder.layers)
+        for v_layer, t_layer in zip(
+            self.vision_model.encoder.layers, self.text_model.encoder.layers
         ):
             v_residual = v_hidden_states
             t_residual = t_hidden_states
@@ -433,7 +436,9 @@ class CLIPModelWithAdapter(CLIPModel):
                 t_hidden_states, self_attn_mask, causal_attention_mask
             )
 
-            if i == 11:
+            if random.random() < self.adapter_config.cross_dropout and self.training:
+                pass
+            else:
                 vt_hidden_states, _ = v_layer.forward_cross_attn(
                     v_hidden_states, t_hidden_states, cross_attn_mask
                 )

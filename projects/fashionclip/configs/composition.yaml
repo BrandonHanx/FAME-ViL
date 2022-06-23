@@ -11,6 +11,7 @@ model_config:
       bottleneck: 64
       dropout: 0.0
       enable_xattn: true
+      cross_dropout: 0.5
     losses:
       - type: bbc_loss
 
@@ -75,7 +76,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition_cross
+  experiment_name: fashionclip_fashioniq_composition_cross_0.5
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
