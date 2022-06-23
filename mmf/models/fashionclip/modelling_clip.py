@@ -128,7 +128,6 @@ class CLIPCrossAttention(nn.Module):
     def forward(
         self, hidden_states, context, attention_mask=None, output_attentions=False
     ):
-        # FIXME: maybe we need two LN here
         hidden_states = self.query_layernorm(hidden_states)
         context = self.context_layernorm(context)
         mixed_query_layer = self.query(hidden_states)
@@ -424,8 +423,8 @@ class CLIPModelWithAdapter(CLIPModel):
                 attention_mask, t_hidden_states.dtype, v_hidden_states.shape[1]
             )
 
-        for v_layer, t_layer in zip(
-            self.vision_model.encoder.layers, self.text_model.encoder.layers
+        for i, v_layer, t_layer in enumerate(
+            zip(self.vision_model.encoder.layers, self.text_model.encoder.layers)
         ):
             v_residual = v_hidden_states
             t_residual = t_hidden_states
@@ -434,15 +433,18 @@ class CLIPModelWithAdapter(CLIPModel):
                 t_hidden_states, self_attn_mask, causal_attention_mask
             )
 
-            vt_hidden_states, _ = v_layer.forward_cross_attn(
-                v_hidden_states, t_hidden_states, cross_attn_mask
-            )
-            tv_hidden_states, _ = t_layer.forward_cross_attn(
-                t_hidden_states, v_hidden_states
-            )
+            if i == 11:
+                vt_hidden_states, _ = v_layer.forward_cross_attn(
+                    v_hidden_states, t_hidden_states, cross_attn_mask
+                )
+                tv_hidden_states, _ = t_layer.forward_cross_attn(
+                    t_hidden_states, v_hidden_states
+                )
+                v_hidden_states = v_hidden_states + vt_hidden_states
+                t_hidden_states = t_hidden_states + tv_hidden_states
 
-            v_hidden_states = v_residual + v_hidden_states + vt_hidden_states
-            t_hidden_states = t_residual + t_hidden_states + tv_hidden_states
+            v_hidden_states = v_residual + v_hidden_states
+            t_hidden_states = t_residual + t_hidden_states
             v_residual = v_hidden_states
             t_residual = t_hidden_states
 
