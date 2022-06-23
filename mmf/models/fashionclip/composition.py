@@ -30,7 +30,7 @@ class FashionCLIPForComposition(FashionCLIPBaseModel):
         tar_embeddings = self.norm_layer(tar_embeddings)
 
         if self.enable_xattn:
-            comp_embeddings, _ = self.clip.get_cross_attn_features(
+            ref_embeddings, text_embeddings = self.clip.get_cross_attn_features(
                 pixel_values=sample_list.ref_image,
                 input_ids=sample_list.input_ids,
                 attention_mask=sample_list.attention_mask,
@@ -40,7 +40,7 @@ class FashionCLIPForComposition(FashionCLIPBaseModel):
             text_embeddings = self.clip.get_text_features(
                 sample_list.input_ids, sample_list.attention_mask
             )
-            comp_embeddings = self.compositor(ref_embeddings, text_embeddings)
+        comp_embeddings = self.compositor(ref_embeddings, text_embeddings)
         comp_embeddings = self.norm_layer(comp_embeddings)
 
         output_dict = {

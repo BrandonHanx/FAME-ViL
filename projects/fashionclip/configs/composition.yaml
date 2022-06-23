@@ -82,6 +82,7 @@ training:
   log_interval: 10
   checkpoint_interval: 5620
   evaluation_interval: 562
+  find_unused_parameters: true
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
