@@ -57,11 +57,12 @@ dataset_config:
 scheduler:
   type: multi_step
   params:
-    use_warmup: false
+    use_warmup: true
     lr_steps:
+    - 2500
     - 4000
     lr_ratio: 0.1
-    warmup_iterations: 2810
+    warmup_iterations: 500
     warmup_factor: 0.25
 
 optimizer:
@@ -76,7 +77,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition_cross_noadapt
+  experiment_name: fashionclip_fashioniq_composition_cross_lr
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000

@@ -454,8 +454,8 @@ class CLIPModelWithAdapter(CLIPModel):
             v_residual = v_hidden_states
             t_residual = t_hidden_states
 
-            v_hidden_states = v_layer.forward_originmlp(v_hidden_states)
-            t_hidden_states = t_layer.forward_originmlp(t_hidden_states)
+            v_hidden_states = v_layer.forward_mlp(v_hidden_states)
+            t_hidden_states = t_layer.forward_mlp(t_hidden_states)
             v_hidden_states = v_residual + v_hidden_states
             t_hidden_states = t_residual + t_hidden_states
 
