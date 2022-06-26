@@ -9,11 +9,11 @@ from .base import FashionCLIPBaseModel
 
 
 class FashionCLIPForComposition(FashionCLIPBaseModel):
-    def __init__(self, config, adapter_config):
-        super().__init__(config, adapter_config)
+    def __init__(self, config):
+        super().__init__(config.clip_config, config.adapter_config)
         self.comp_mode = config.get("comp_mode", "va")
         self.norm_layer = NormalizationLayer()
-        self.enable_xattn = adapter_config.enable_xattn
+        self.enable_xattn = config.adapter_config.enable_xattn
         if self.comp_mode == "va":
             self.compositor = VectorAddition()
         elif self.comp_mode == "vh":

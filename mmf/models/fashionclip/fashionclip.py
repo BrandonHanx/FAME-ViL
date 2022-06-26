@@ -22,9 +22,7 @@ class FashionCLIP(BaseModel):
 
     def build(self):
         if self.training_head_type == "composition":
-            self.model = FashionCLIPForComposition(
-                self.config.clip_config, self.config.adapter_config
-            )
+            self.model = FashionCLIPForComposition(self.config)
         else:
             raise NotImplementedError
 
