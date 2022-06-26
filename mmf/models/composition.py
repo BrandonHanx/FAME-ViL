@@ -63,6 +63,11 @@ class VectorSubtraction(nn.Module):
         return x - y
 
 
+class VectorHadamard(nn.Module):
+    def forward(self, x, y):
+        return x * y
+
+
 class NormalizationLayer(nn.Module):
     """Class for normalization layer."""
 

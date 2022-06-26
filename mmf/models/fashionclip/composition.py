@@ -2,7 +2,7 @@
 
 from typing import Dict
 
-from mmf.models.composition import NormalizationLayer, VectorAddition
+from mmf.models.composition import NormalizationLayer, VectorAddition, VectorHadamard
 from torch import Tensor
 
 from .base import FashionCLIPBaseModel
@@ -16,6 +16,8 @@ class FashionCLIPForComposition(FashionCLIPBaseModel):
         self.enable_xattn = adapter_config.enable_xattn
         if self.comp_mode == "va":
             self.compositor = VectorAddition()
+        elif self.comp_mode == "vh":
+            self.compositor = VectorHadamard()
         else:
             raise NotImplementedError
 
