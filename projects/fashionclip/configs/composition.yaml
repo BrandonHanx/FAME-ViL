@@ -9,10 +9,10 @@ model_config:
     adapter_config:
       freeze: true
       adapter_name: scaled_pa
-      bottleneck: 64
+      bottleneck: 128
       dropout: 0.0
-      enable_xattn: true
-      share_cross: true
+      enable_xattn: false
+      share_cross: false
       cross_dropout: 0.0
     losses:
       - type: bbc_loss
@@ -78,7 +78,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition_share
+  experiment_name: fashionclip_fashioniq_composition_128
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
