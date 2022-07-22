@@ -33,6 +33,7 @@ class CLIPAdapterConfig:
         dropout: float = 0.0,
         enable_xattn: bool = False,
         cross_dropout: float = 0.0,
+        share_cross: bool = False,
     ):
         self.freeze = freeze
         self.adapter_name = adapter_name
@@ -40,6 +41,7 @@ class CLIPAdapterConfig:
         self.dropout = dropout
         self.enable_xattn = enable_xattn
         self.cross_dropout = cross_dropout
+        self.share_cross = share_cross
 
 
 class Adapter(nn.Module):
@@ -294,7 +296,7 @@ class CLIPEncoderWithAdapter(CLIPEncoder):
                 for _ in range(config.num_hidden_layers)
             ]
         )
-        if adapter_config.get("share_cross", False):
+        if adapter_config.share_cross:
             for i in range(config.num_hidden_layers):
                 self.layers[i].cross_attn = self.layers[0].cross_attn
         self.gradient_checkpointing = False
