@@ -294,6 +294,9 @@ class CLIPEncoderWithAdapter(CLIPEncoder):
                 for _ in range(config.num_hidden_layers)
             ]
         )
+        if adapter_config.get("share_cross", False):
+            for i in range(config.num_hidden_layers):
+                self.layers[i].cross_attn = self.layers[0].cross_attn
         self.gradient_checkpointing = False
 
 
