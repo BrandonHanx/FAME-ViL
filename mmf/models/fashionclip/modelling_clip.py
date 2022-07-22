@@ -103,6 +103,66 @@ class Adapter(nn.Module):
         return output
 
 
+class ConvPass(nn.Module):
+    def __init__(
+        self,
+        d_model,
+        bottleneck,
+        adapter_scalar="learnable_scalar",
+        adapter_layernorm_option="in",
+    ):
+        super().__init__()
+        self.n_embd = d_model
+        self.down_size = bottleneck
+
+        # _before
+        self.adapter_layernorm_option = adapter_layernorm_option
+
+        self.adapter_layer_norm_before = None
+        if adapter_layernorm_option == "in" or adapter_layernorm_option == "out":
+            self.adapter_layer_norm_before = nn.LayerNorm(self.n_embd)
+
+        if adapter_scalar == "learnable_scalar":
+            self.scale = nn.Parameter(torch.ones(1))
+        else:
+            self.scale = float(adapter_scalar)
+
+        self.down_conv = nn.Conv1d(self.n_embd, self.down_size, 1, stride=1, padding=0)
+        self.non_linear_func = nn.GELU()
+        self.in_conv = nn.Conv2d(self.down_size, self.down_size, 3, stride=1, padding=1)
+        self.up_conv = nn.Conv1d(self.down_size, self.n_embd, 1, stride=1, padding=0)
+
+    def forward(self, x, add_residual=True, residual=None):
+        residual = x if residual is None else residual
+        if self.adapter_layernorm_option == "in":
+            x = self.adapter_layer_norm_before(x)
+
+        b, _, d = x.shape
+        down = self.down_conv(x.reshape(b, d, -1))
+        down = self.non_linear_func(down)
+        down_cls = self.in_conv(down[:, :, 0].reshape(b, self.down_size, 1, 1)).squeeze(
+            -1
+        )
+        down_ctx = self.in_conv(
+            down[:, :, 1:].reshape(b, self.down_size, 14, 14)
+        ).reshape(b, self.down_size, -1)
+        down = torch.cat([down_cls, down_ctx], dim=2)
+        down = self.non_linear_func(down)
+        up = self.up_conv(down).reshape(b, -1, d)
+
+        up = up * self.scale
+
+        if self.adapter_layernorm_option == "out":
+            up = self.adapter_layer_norm_before(up)
+
+        if add_residual:
+            output = up + residual
+        else:
+            output = up
+
+        return output
+
+
 class CLIPCrossAttention(nn.Module):
     def __init__(self, config, ctx_dim=None):
         super().__init__()
@@ -185,7 +245,15 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         if self.adapter_config is not None:
             if self.adapter_config.freeze:
                 self.freeze()
-            if self.adapter_config.adapter_name == "scaled_pa":
+            if (
+                self.adapter_config.adapter_name == "convpass"
+                and config.hidden_size == 768
+            ):
+                self.adapt_mlp = ConvPass(
+                    self.embed_dim,
+                    self.adapter_config.bottleneck,
+                )
+            else:
                 self.adapt_mlp = Adapter(
                     self.embed_dim,
                     self.adapter_config.bottleneck,
