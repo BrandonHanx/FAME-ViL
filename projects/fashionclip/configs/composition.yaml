@@ -8,8 +8,8 @@ model_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
       freeze: true
-      adapter_name: convpass
-      bottleneck: 64
+      adapter_name: scaled_pa
+      bottleneck: 32
       dropout: 0.0
       enable_xattn: false
       share_cross: false
