@@ -519,11 +519,9 @@ class CLIPModelWithAdapter(CLIPModel):
                 pass
             else:
                 vt_hidden_states, _ = v_layer.forward_cross_attn(
-                    v_hidden_states, t_hidden_states, cross_attn_mask
+                    v_residual, t_residual, cross_attn_mask
                 )
-                tv_hidden_states, _ = t_layer.forward_cross_attn(
-                    t_hidden_states, v_hidden_states
-                )
+                tv_hidden_states, _ = t_layer.forward_cross_attn(t_residual, v_residual)
                 v_hidden_states = v_hidden_states + vt_hidden_states
                 t_hidden_states = t_hidden_states + tv_hidden_states
 
