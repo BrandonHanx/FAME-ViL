@@ -34,6 +34,7 @@ class CLIPAdapterConfig:
         enable_xattn: bool = False,
         cross_dropout: float = 0.0,
         share_cross: bool = False,
+        share_adapter: bool = False,
     ):
         self.freeze = freeze
         self.adapter_name = adapter_name
@@ -42,6 +43,7 @@ class CLIPAdapterConfig:
         self.enable_xattn = enable_xattn
         self.cross_dropout = cross_dropout
         self.share_cross = share_cross
+        self.share_adapter = share_adapter
 
 
 class Adapter(nn.Module):
@@ -364,6 +366,9 @@ class CLIPEncoderWithAdapter(CLIPEncoder):
                 for _ in range(config.num_hidden_layers)
             ]
         )
+        if adapter_config.share_adapter:
+            for i in range(config.num_hidden_layers):
+                self.layers[i].adapt_mlp = self.layers[0].adapt_mlp
         if adapter_config.share_cross:
             for i in range(config.num_hidden_layers):
                 self.layers[i].cross_attn = self.layers[0].cross_attn
