@@ -366,12 +366,13 @@ class CLIPEncoderWithAdapter(CLIPEncoder):
                 for _ in range(config.num_hidden_layers)
             ]
         )
-        if adapter_config.share_adapter:
-            for i in range(config.num_hidden_layers):
-                self.layers[i].adapt_mlp = self.layers[0].adapt_mlp
-        if adapter_config.share_cross:
-            for i in range(config.num_hidden_layers):
-                self.layers[i].cross_attn = self.layers[0].cross_attn
+        if adapter_config is not None:
+            if adapter_config.share_adapter:
+                for i in range(config.num_hidden_layers):
+                    self.layers[i].adapt_mlp = self.layers[0].adapt_mlp
+            if adapter_config.share_cross:
+                for i in range(config.num_hidden_layers):
+                    self.layers[i].cross_attn = self.layers[0].cross_attn
         self.gradient_checkpointing = False
 
 

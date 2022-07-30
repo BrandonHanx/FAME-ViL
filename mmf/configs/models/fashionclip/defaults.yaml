@@ -3,8 +3,3 @@ model_config:
     training_head_type: composition
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
-    adapter_config:
-      freeze: true
-      adapter_name: scaled_pa
-      bottleneck: 64
-      dropout: 0.0
