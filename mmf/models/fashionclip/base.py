@@ -3,6 +3,7 @@
 import os
 from typing import Dict, List
 
+import torch
 from mmf.utils.configuration import get_mmf_cache_dir
 from mmf.utils.transform import (
     transform_to_batch_sequence,
@@ -56,10 +57,21 @@ class FashionCLIPBaseModel(nn.Module):
     ) -> Dict[str, Tensor]:
         return sample_list
 
+    def _check_dim(
+        self, sample_list: Dict[str, Tensor], key: str, dim: int
+    ) -> Dict[str, Tensor]:
+        if hasattr(sample_list, key) and sample_list[key].dim() > dim:
+            sample_list[key] = torch.flatten(sample_list[key], end_dim=-dim)
+        return sample_list
+
+    def check_dim(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        return sample_list
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         raise NotImplementedError
 
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        sample_list = self.check_dim(sample_list)
         sample_list = self.add_custom_params(sample_list)
         sample_list = self.flatten_for_clip(sample_list)
         sample_list = self.add_post_flatten_params(sample_list)

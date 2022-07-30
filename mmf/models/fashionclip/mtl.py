@@ -84,3 +84,10 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             return self._forward_itc(sample_list)
         if sample_list.dataset_name == "fashioniq":
             return self._forward_tgir(sample_list)
+
+    def check_dim(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self._check_dim(sample_list, "image", 4)
+        self._check_dim(sample_list, "image_id", 2)
+        self._check_dim(sample_list, "input_ids", 2)
+        self._check_dim(sample_list, "attention_mask", 2)
+        return sample_list
