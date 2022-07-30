@@ -23,7 +23,7 @@ class CLIPTokenProcessor(BaseProcessor):
 
     def __call__(self, item: Dict[str, Any]):
         data = self._tokenizer(
-            [item["text"]], padding="max_length", return_tensors="pt"
+            [item["text"]], padding="max_length", return_tensors="pt", truncation=True
         )
         data["text"] = item["text"]
         return data

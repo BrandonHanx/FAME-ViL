@@ -10,7 +10,7 @@ from .base import FashionCLIPBaseModel
 
 class FashionCLIPForComposition(FashionCLIPBaseModel):
     def __init__(self, config):
-        super().__init__(config.clip_config, config.adapter_config)
+        super().__init__(config.clip_config, config.get("adapter_config", None))
         self.comp_mode = config.get("comp_mode", "va")
         self.norm_layer = NormalizationLayer()
         self.enable_xattn = config.adapter_config.enable_xattn

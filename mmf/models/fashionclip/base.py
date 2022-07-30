@@ -15,14 +15,15 @@ from .modelling_clip import CLIPModelWithAdapter, CLIPAdapterConfig
 
 
 class FashionCLIPBaseModel(nn.Module):
-    def __init__(self, config, adapter_config):
+    def __init__(self, config, adapter_config=None):
         super().__init__()
         clip_model_name = getattr(
             config, "clip_model_name", "openai/clip-vit-base-patch16"
         )
-        adapter_config = CLIPAdapterConfig(
-            **OmegaConf.to_container(adapter_config, resolve=True)
-        )
+        if adapter_config is not None:
+            adapter_config = CLIPAdapterConfig(
+                **OmegaConf.to_container(adapter_config, resolve=True)
+            )
 
         self.config = config
         self.clip = CLIPModelWithAdapter.from_pretrained(

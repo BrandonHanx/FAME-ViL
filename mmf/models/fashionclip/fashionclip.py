@@ -7,6 +7,7 @@ from mmf.models import BaseModel
 from torch import Tensor
 
 from .composition import FashionCLIPForComposition
+from .mtl import FashionCLIPForMTL
 
 
 @registry.register_model("fashionclip")
@@ -23,6 +24,8 @@ class FashionCLIP(BaseModel):
     def build(self):
         if self.training_head_type == "composition":
             self.model = FashionCLIPForComposition(self.config)
+        elif self.training_head_type == "mtl":
+            self.model = FashionCLIPForMTL(self.config)
         else:
             raise NotImplementedError
 
