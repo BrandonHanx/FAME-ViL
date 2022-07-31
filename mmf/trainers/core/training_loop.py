@@ -95,10 +95,14 @@ class TrainerTrainingLoopMixin(ABC):
                 if combined_report is None:
                     combined_report = report
                 else:
-                    combined_report.accumulate_tensor_fields_and_loss(
-                        report, self.metrics.required_params
-                    )
-                    combined_report.batch_size += report.batch_size
+                    if not self.training_config.accumulate_feilds:
+                        # only the losses are updated
+                        combined_report.losses.update(report.losses)
+                    else:
+                        combined_report.accumulate_tensor_fields_and_loss(
+                            report, self.metrics.required_params
+                        )
+                        combined_report.batch_size += report.batch_size
 
                 # batch execution ends here
                 self.on_batch_end(report=combined_report, meter=self.meter)

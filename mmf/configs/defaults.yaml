@@ -75,6 +75,8 @@ training:
     # one update (one optimizer step). The effect is a large effective batch size of
     # KxN (without incurring the memory overhead of setting batch_size to KxN).
     update_frequency: 1
+    # MTL (one-forward version) doesn't need to accumulate feilds
+    accumulate_feilds: true
     # Number of workers to be used in dataloaders
     num_workers: 4
     # Some datasets allow fast reading by loading everything in the memory
