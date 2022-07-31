@@ -42,7 +42,7 @@ evaluation:
 
 training:
   experiment_name: fashionclip_mtl(itc+tgir)_of
-  batch_size: 64
+  batch_size: 4
   lr_scheduler: true
   max_updates: 30000
   log_interval: 10
@@ -51,6 +51,9 @@ training:
   find_unused_parameters: true
   update_frequency: 2
   accumulate_feilds: false
+  clip_norm_mode: all
+  clip_gradients: true
+  max_grad_l2_norm: 5
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
