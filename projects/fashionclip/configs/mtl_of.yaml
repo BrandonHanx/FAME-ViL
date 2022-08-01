@@ -27,7 +27,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 5e-5
+    lr: 1e-6
     eps: 1e-8
     weight_decay: 0.0
 
@@ -42,7 +42,7 @@ evaluation:
 
 training:
   experiment_name: fashionclip_mtl(itc+tgir)_of
-  batch_size: 4
+  batch_size: 64
   lr_scheduler: true
   max_updates: 30000
   log_interval: 10
@@ -51,14 +51,11 @@ training:
   find_unused_parameters: true
   update_frequency: 2
   accumulate_feilds: false
-  clip_norm_mode: all
-  clip_gradients: true
-  max_grad_l2_norm: 5
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
-  # wandb:
-  #   enabled: true
+  wandb:
+    enabled: true
 
 run_type: train_val
 

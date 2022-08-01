@@ -10,6 +10,7 @@ from mmf.common.meter import Meter
 from mmf.common.registry import registry
 from mmf.common.report import Report
 from mmf.common.sample import to_device
+from mmf.datasets.concat_dataset import MMFConcatDataset
 from mmf.utils.distributed import is_xla
 from mmf.utils.general import clip_gradients, extract_loss, get_max_updates
 from torch import Tensor
@@ -70,6 +71,7 @@ class TrainerTrainingLoopMixin(ABC):
                 if isinstance(
                     self.train_loader.current_dataset, torch.utils.data.IterableDataset
                 )
+                or isinstance(self.train_loader.current_dataset, MMFConcatDataset)
                 else len(self.train_loader)
             )
 
