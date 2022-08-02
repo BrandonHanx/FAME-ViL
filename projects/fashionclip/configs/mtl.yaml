@@ -36,9 +36,9 @@ evaluation:
   - type: r@k_fashioniq
     datasets:
     - fashioniq
-  # - type: r@k_general
-  #   datasets:
-  #   - fashiongen
+  - type: r@k_general
+    datasets:
+    - fashiongen
 
 training:
   experiment_name: fashionclip_mtl(itc+tgir)
