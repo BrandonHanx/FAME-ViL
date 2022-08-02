@@ -87,7 +87,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
 
     def check_dim(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         self._check_dim(sample_list, "image", 4)
-        self._check_dim(sample_list, "image_id", 2)
+        self._check_dim(sample_list, "image_id", 1)
         self._check_dim(sample_list, "input_ids", 2)
         self._check_dim(sample_list, "attention_mask", 2)
         return sample_list

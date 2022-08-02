@@ -120,28 +120,27 @@ class FashionDataset(MMFDataset):
                 current_sample.image = features
 
             current_sample.text_id = torch.tensor(sample_info["id"], dtype=torch.long)
-            current_sample.image_id = current_sample.text_id
+            current_sample.image_id = current_sample.text_id.repeat(len(image_path))
             if "subcategory_id" in sample_info:
                 current_sample.text_subcat_id = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
                 current_sample.image_subcat_id = current_sample.text_subcat_id.repeat(len(image_path))
 
-            if self._category_label:
-                current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long)
-            elif self._subcategory_label:
-                current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
+            if self._category_label or self._subcategory_label:
+                if self._category_label:
+                    current_sample.targets = torch.tensor(sample_info["category_id"], dtype=torch.long)
+                elif self._subcategory_label:
+                    current_sample.targets = torch.tensor(sample_info["subcategory_id"], dtype=torch.long)
+                if not self._multiple_image_input:
+                    current_sample.targets = current_sample.targets.repeat(len(image_path))
+                    if hasattr(current_sample, "input_ids"):
+                        current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
+                    if hasattr(current_sample, "segment_ids"):
+                        current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
+                        current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
+                    if hasattr(current_sample, "attention_mask"):
+                        current_sample.attention_mask = current_sample.attention_mask.repeat(len(image_path), 1)
             else:
                 current_sample.targets = torch.tensor(1, dtype=torch.long)
-
-            if not self._multiple_image_input:
-                current_sample.image_id = current_sample.image_id.repeat(len(image_path))
-                current_sample.targets = current_sample.targets.repeat(len(image_path))
-                if hasattr(current_sample, "input_ids"):
-                    current_sample.input_ids = current_sample.input_ids.repeat(len(image_path), 1)
-                if hasattr(current_sample, "segment_ids"):
-                    current_sample.segment_ids = current_sample.segment_ids.repeat(len(image_path), 1)
-                    current_sample.input_mask = current_sample.input_mask.repeat(len(image_path), 1)
-                if hasattr(current_sample, "attention_mask"):
-                    current_sample.attention_mask = current_sample.attention_mask.repeat(len(image_path), 1)
 
         current_sample.ann_idx = torch.tensor(idx, dtype=torch.long)
 

@@ -42,10 +42,10 @@ class TrainerEvaluationLoopMixin(ABC):
                         loaded_batches += 1
                         prepared_batch = reporter.prepare_batch(batch)
                         prepared_batch = to_device(prepared_batch, self.device)
-                        if not validate_batch_sizes(prepared_batch.get_batch_size()):
-                            logger.info("Skip batch due to uneven batch sizes.")
-                            skipped_batches += 1
-                            continue
+                        # if not validate_batch_sizes(prepared_batch.get_batch_size()):
+                        #     logger.info("Skip batch due to uneven batch sizes.")
+                        #     skipped_batches += 1
+                        #     continue
                         model_output = self.model(prepared_batch)
                         report = Report(prepared_batch, model_output)
                         report = report.detach()
