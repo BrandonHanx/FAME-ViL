@@ -77,6 +77,7 @@ training:
     update_frequency: 1
     # MTL (one-forward version) doesn't need to accumulate feilds
     accumulate_feilds: true
+    accumulate_losses: false
     # Number of workers to be used in dataloaders
     num_workers: 4
     # Some datasets allow fast reading by loading everything in the memory

@@ -3,7 +3,7 @@
 import gc
 import logging
 from abc import ABC
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import torch
 from mmf.common.meter import Meter
@@ -24,6 +24,7 @@ class TrainerTrainingLoopMixin(ABC):
     current_iteration: int = 0
     num_updates: int = 0
     meter: Meter = Meter()
+    losses: List = []
 
     def training_loop(self) -> None:
         self.max_updates = self._calculate_max_updates()
@@ -90,7 +91,15 @@ class TrainerTrainingLoopMixin(ABC):
                 self.on_batch_start()
                 self.profile("Batch load time")
 
-                report = self.run_training_batch(batch, num_batches_for_this_update)
+                if not self.training_config.accumulate_losses:
+                    report = self.run_training_batch(
+                        batch, num_batches_for_this_update, do_backward=True
+                    )
+                else:
+                    report, loss = self.run_training_batch(
+                        batch, num_batches_for_this_update, do_backward=False
+                    )
+                    self.losses.append(loss)
                 report = report.detach()
 
                 # accumulate necessary params (including loss) for metric calculation
@@ -168,13 +177,17 @@ class TrainerTrainingLoopMixin(ABC):
                 if should_break:
                     break
 
-    def run_training_batch(self, batch: Dict[str, Tensor], loss_divisor: int) -> None:
+    def run_training_batch(
+        self, batch: Dict[str, Tensor], loss_divisor: int, do_backward: bool = True
+    ) -> None:
         report = self._forward(batch)
         if self.training_config.exit_on_nan_losses:
             self._check_nan_losses(report)
         loss = extract_loss(report, loss_divisor)
-        self._backward(loss)
-        return report
+        if do_backward:
+            self._backward(loss)
+            return report
+        return report, loss
 
     def _check_nan_losses(self, report):
         # skip this check in XLA mode as calling .item() in forward pass
@@ -219,6 +232,12 @@ class TrainerTrainingLoopMixin(ABC):
         self.profile("Backward time")
 
     def _finish_update(self):
+        if self.training_config.accumulate_losses:
+            sum_loss = 0
+            for x in self.losses:
+                sum_loss = sum_loss + x
+            self._backward(sum_loss)
+            self.losses = []
         if self.training_config.clip_gradients:
             clip_gradients(
                 self.model,
