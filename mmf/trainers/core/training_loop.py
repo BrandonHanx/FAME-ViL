@@ -24,7 +24,7 @@ class TrainerTrainingLoopMixin(ABC):
     current_iteration: int = 0
     num_updates: int = 0
     meter: Meter = Meter()
-    losses: List = []
+    gradients: List = []
 
     def training_loop(self) -> None:
         self.max_updates = self._calculate_max_updates()
@@ -91,15 +91,11 @@ class TrainerTrainingLoopMixin(ABC):
                 self.on_batch_start()
                 self.profile("Batch load time")
 
-                if not self.training_config.accumulate_losses:
-                    report = self.run_training_batch(
-                        batch, num_batches_for_this_update, do_backward=True
-                    )
-                else:
-                    report, loss = self.run_training_batch(
-                        batch, num_batches_for_this_update, do_backward=False
-                    )
-                    self.losses.append(loss)
+                report = self.run_training_batch(
+                    batch,
+                    num_batches_for_this_update,
+                    self.training_config.buffer_gradients,
+                )
                 report = report.detach()
 
                 # accumulate necessary params (including loss) for metric calculation
@@ -178,16 +174,23 @@ class TrainerTrainingLoopMixin(ABC):
                     break
 
     def run_training_batch(
-        self, batch: Dict[str, Tensor], loss_divisor: int, do_backward: bool = True
+        self,
+        batch: Dict[str, Tensor],
+        loss_divisor: int,
+        buffer_gradients: bool = False,
     ) -> None:
         report = self._forward(batch)
         if self.training_config.exit_on_nan_losses:
             self._check_nan_losses(report)
         loss = extract_loss(report, loss_divisor)
-        if do_backward:
-            self._backward(loss)
-            return report
-        return report, loss
+        self._backward(loss)
+        if buffer_gradients:
+            grads = {}
+            for n, p in self.model.named_parameters():
+                grads[n] = p.grad.clone() if p.grad is not None else None
+            self.gradients.append(grads)
+            self.optimizer.zero_grad()
+        return report
 
     def _check_nan_losses(self, report):
         # skip this check in XLA mode as calling .item() in forward pass
@@ -232,12 +235,15 @@ class TrainerTrainingLoopMixin(ABC):
         self.profile("Backward time")
 
     def _finish_update(self):
-        if self.training_config.accumulate_losses:
-            sum_loss = 0
-            for x in self.losses:
-                sum_loss = sum_loss + x
-            self._backward(sum_loss)
-            self.losses = []
+        if self.training_config.buffer_gradients:
+            for n, p in self.model.named_parameters():
+                for grad in self.gradients:
+                    p.grad = (
+                        p.grad + grad.get(n, 0)
+                        if p.grad is not None and grad.get(n, 0) is not None
+                        else p.grad
+                    )
+            self.gradients = []
         if self.training_config.clip_gradients:
             clip_gradients(
                 self.model,

@@ -51,6 +51,7 @@ training:
   find_unused_parameters: true
   update_frequency: 2
   accumulate_feilds: false
+  buffer_gradients: true
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
