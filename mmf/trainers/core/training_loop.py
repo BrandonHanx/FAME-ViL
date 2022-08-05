@@ -5,6 +5,7 @@ import logging
 from abc import ABC
 from typing import Any, Dict, List
 
+import mmf.trainers.core.gradient_strategy as gradient_strategy
 import torch
 from mmf.common.meter import Meter
 from mmf.common.registry import registry
@@ -237,12 +238,12 @@ class TrainerTrainingLoopMixin(ABC):
     def _finish_update(self):
         if self.training_config.buffer_gradients:
             for n, p in self.model.named_parameters():
-                for grad in self.gradients:
-                    p.grad = (
-                        p.grad + grad.get(n, 0)
-                        if p.grad is not None and grad.get(n, 0) is not None
-                        else p.grad
-                    )
+                if self.training_config.gradient_strategy == "sum":
+                    p.grad = gradient_strategy.sum(p.grad, n, self.gradients)
+                elif self.training_config.gradient_strategy == "imtlg":
+                    p.grad = gradient_strategy.imtlg(p.grad, n, self.gradients)
+                else:
+                    raise NotImplementedError
             self.gradients = []
         if self.training_config.clip_gradients:
             clip_gradients(

@@ -78,6 +78,7 @@ training:
     # MTL (one-forward version) doesn't need to accumulate feilds
     accumulate_feilds: true
     buffer_gradients: false
+    gradient_strategy: sum
     # Number of workers to be used in dataloaders
     num_workers: 4
     # Some datasets allow fast reading by loading everything in the memory
