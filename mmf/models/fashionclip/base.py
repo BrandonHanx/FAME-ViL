@@ -12,7 +12,7 @@ from mmf.utils.transform import (
 from omegaconf import OmegaConf
 from torch import Tensor, nn
 
-from .modelling_clip import CLIPModelWithAdapter, CLIPAdapterConfig
+from .modeling_clip_adapter import CLIPModelWithAdapter, CLIPAdapterConfig
 
 
 class FashionCLIPBaseModel(nn.Module):

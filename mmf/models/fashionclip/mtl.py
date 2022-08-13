@@ -38,11 +38,13 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         return flattened
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        visual_embeddings = self.clip.get_image_features(sample_list.image)
+        visual_embeddings = self.clip.get_image_features(
+            sample_list.image, task_name="itc"
+        )
         visual_embeddings = self.heads["itc"](visual_embeddings)
 
         text_embeddings = self.clip.get_text_features(
-            sample_list.input_ids, sample_list.attention_mask
+            sample_list.input_ids, sample_list.attention_mask, task_name="itc"
         )
         text_embeddings = self.heads["itc"](text_embeddings)
 
@@ -58,12 +60,16 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         return output_dict
 
     def _forward_tgir(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        tar_embeddings = self.clip.get_image_features(sample_list.tar_image)
+        tar_embeddings = self.clip.get_image_features(
+            sample_list.tar_image, task_name="tgir"
+        )
         tar_embeddings = self.heads["tgir"](tar_embeddings)
 
-        ref_embeddings = self.clip.get_image_features(sample_list.ref_image)
+        ref_embeddings = self.clip.get_image_features(
+            sample_list.ref_image, task_name="tgir"
+        )
         text_embeddings = self.clip.get_text_features(
-            sample_list.input_ids, sample_list.attention_mask
+            sample_list.input_ids, sample_list.attention_mask, task_name="tgir"
         )
         comp_embeddings = ref_embeddings + text_embeddings  # vector addition
         comp_embeddings = self.heads["tgir"](comp_embeddings)

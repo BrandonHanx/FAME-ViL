@@ -4,6 +4,7 @@ from typing import Dict
 
 from mmf.common.registry import registry
 from mmf.models import BaseModel
+from mmf.utils.modeling import get_fashionvil_configured_parameters
 from torch import Tensor
 
 from .composition import FashionCLIPForComposition
@@ -28,6 +29,23 @@ class FashionCLIP(BaseModel):
             self.model = FashionCLIPForMTL(self.config)
         else:
             raise NotImplementedError
+
+    def get_optimizer_parameters(self, config):
+        base_lr = config.optimizer.params.lr
+        weight_decay = config.optimizer.params.weight_decay
+        lr_multiplier = self.config.lr_multiplier
+
+        print(self.model.state_dict().keys())
+
+        lr_filter = ["adapt_mlp"]
+        params = get_fashionvil_configured_parameters(
+            self.model,
+            base_lr,
+            weight_decay,
+            lr_filter,
+            lr_multiplier,
+        )
+        return params
 
     def forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         return self.model(sample_list)

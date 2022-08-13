@@ -3,7 +3,7 @@
 import math
 import random
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 import torch.nn as nn
@@ -13,13 +13,16 @@ from transformers.modeling_clip import (
     CLIPConfig,
     CLIPAttention,
     CLIPMLP,
-    CLIPEncoder,
-    CLIPTextTransformer,
-    CLIPVisionTransformer,
     CLIPVisionEmbeddings,
     CLIPTextEmbeddings,
-    CLIPModel,
     _expand_mask,
+)
+
+from .modeling_clip import (
+    _CLIPEncoder,
+    _CLIPTextTransformer,
+    _CLIPVisionTransformer,
+    _CLIPModel,
 )
 
 
@@ -35,6 +38,7 @@ class CLIPAdapterConfig:
         cross_dropout: float = 0.0,
         share_cross: bool = False,
         share_adapter: bool = False,
+        adapter_name_list: List = [],
     ):
         self.freeze = freeze
         self.adapter_name = adapter_name
@@ -44,6 +48,7 @@ class CLIPAdapterConfig:
         self.cross_dropout = cross_dropout
         self.share_cross = share_cross
         self.share_adapter = share_adapter
+        self.adapter_name_list = adapter_name_list
 
 
 class Adapter(nn.Module):
@@ -256,11 +261,20 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     self.adapter_config.bottleneck,
                 )
             else:
-                self.adapt_mlp = Adapter(
-                    self.embed_dim,
-                    self.adapter_config.bottleneck,
-                    self.adapter_config.dropout,
-                )
+                if len(self.adapter_config.adapter_name_list) > 0:
+                    self.adapt_mlp = nn.ModuleDict()
+                    for k in self.adapter_config.adapter_name_list:
+                        self.adapt_mlp[k] = Adapter(
+                            self.embed_dim,
+                            self.adapter_config.bottleneck,
+                            self.adapter_config.dropout,
+                        )
+                else:
+                    self.adapt_mlp = Adapter(
+                        self.embed_dim,
+                        self.adapter_config.bottleneck,
+                        self.adapter_config.dropout,
+                    )
             if self.adapter_config.enable_xattn:
                 # FIXME: monkey patching
                 self.cross_attn = CLIPCrossAttention(
@@ -314,17 +328,26 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         hidden_states = self.mlp(hidden_states)
         return hidden_states
 
-    def forward_adaptmlp(self, hidden_states: torch.Tensor) -> torch.FloatTensor:
-        adapt_hidden_states = self.adapt_mlp(hidden_states, add_residual=False)
+    def forward_adaptmlp(
+        self, hidden_states: torch.Tensor, task_name: str = None
+    ) -> torch.FloatTensor:
+        if task_name is not None:
+            adapt_hidden_states = self.adapt_mlp[task_name](
+                hidden_states, add_residual=False
+            )
+        else:
+            adapt_hidden_states = self.adapt_mlp(hidden_states, add_residual=False)
         hidden_states = self.layer_norm2(hidden_states)
         hidden_states = self.mlp(hidden_states)
         return hidden_states + adapt_hidden_states
 
-    def forward_mlp(self, hidden_states: torch.Tensor) -> torch.FloatTensor:
+    def forward_mlp(
+        self, hidden_states: torch.Tensor, task_name: str = None
+    ) -> torch.FloatTensor:
         if self.adapter_config is None:
             hidden_states = self.forward_originmlp(hidden_states)
         else:
-            hidden_states = self.forward_adaptmlp(hidden_states)
+            hidden_states = self.forward_adaptmlp(hidden_states, task_name)
         return hidden_states
 
     def forward(
@@ -333,6 +356,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         attention_mask: torch.Tensor,
         causal_attention_mask: torch.Tensor,
         output_attentions: Optional[bool] = False,
+        task_name: Optional[str] = None,
     ) -> Tuple[torch.FloatTensor]:
 
         residual = hidden_states
@@ -344,7 +368,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         hidden_states = hidden_states + residual
         residual = hidden_states
 
-        hidden_states = self.forward_mlp(hidden_states)
+        hidden_states = self.forward_mlp(hidden_states, task_name)
 
         hidden_states = hidden_states + residual
 
@@ -356,7 +380,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         return outputs
 
 
-class CLIPEncoderWithAdapter(CLIPEncoder):
+class CLIPEncoderWithAdapter(_CLIPEncoder):
     def __init__(self, config: CLIPConfig, adapter_config: CLIPAdapterConfig = None):
         super().__init__(config)
         self.config = config
@@ -376,7 +400,7 @@ class CLIPEncoderWithAdapter(CLIPEncoder):
         self.gradient_checkpointing = False
 
 
-class CLIPTextTransformerWithAdapter(CLIPTextTransformer):
+class CLIPTextTransformerWithAdapter(_CLIPTextTransformer):
     def __init__(
         self, config: CLIPTextConfig, adapter_config: CLIPAdapterConfig = None
     ):
@@ -401,7 +425,7 @@ class CLIPTextTransformerWithAdapter(CLIPTextTransformer):
         self._freeze(self.final_layer_norm)
 
 
-class CLIPVisionTransformerWithAdapter(CLIPVisionTransformer):
+class CLIPVisionTransformerWithAdapter(_CLIPVisionTransformer):
     def __init__(
         self, config: CLIPVisionConfig, adapter_config: CLIPAdapterConfig = None
     ):
@@ -429,7 +453,7 @@ class CLIPVisionTransformerWithAdapter(CLIPVisionTransformer):
         self._freeze(self.post_layernorm)
 
 
-class CLIPModelWithAdapter(CLIPModel):
+class CLIPModelWithAdapter(_CLIPModel):
     config_class = CLIPConfig
 
     def __init__(self, config: CLIPConfig, adapter_config: CLIPAdapterConfig = None):
