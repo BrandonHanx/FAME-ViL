@@ -9,14 +9,15 @@ model_config:
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
-      freeze: true
+      freeze: false
       adapter_name: scaled_pa
       bottleneck: 64
       dropout: 0.0
       enable_xattn: false
       share_cross: false
-      share_adapter: true
+      share_adapter: false
       cross_dropout: 0.0
+    lr_multiplier: 100
     losses:
       - type: bbc_loss
 
@@ -33,7 +34,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 1e-4
+    lr: 1e-6
     eps: 1e-8
     weight_decay: 0.0
 
@@ -42,7 +43,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition_128
+  experiment_name: fashionclip_fashioniq_composition_alltrain
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000
