@@ -331,7 +331,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
     def forward_adaptmlp(
         self, hidden_states: torch.Tensor, task_name: str = None
     ) -> torch.FloatTensor:
-        if task_name is not None:
+        if task_name is not None and isinstance(self.adapt_mlp, nn.ModuleDict):
             adapt_hidden_states = self.adapt_mlp[task_name](
                 hidden_states, add_residual=False
             )
