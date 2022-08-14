@@ -26,7 +26,6 @@ class FashionCLIPBaseModel(nn.Module):
                 **OmegaConf.to_container(adapter_config, resolve=True)
             )
 
-        self.config = config
         self.clip = CLIPModelWithAdapter.from_pretrained(
             clip_model_name,
             adapter_config=adapter_config,

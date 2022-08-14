@@ -37,7 +37,7 @@ class FashionCLIP(BaseModel):
 
         print(self.model.state_dict().keys())
 
-        lr_filter = ["adapt_mlp"]
+        lr_filter = ["adapt_mlp", "heads"]
         params = get_fashionvil_configured_parameters(
             self.model,
             base_lr,

@@ -15,6 +15,18 @@ class FashionGenBuilder(MMFDatasetBuilder):
         return "configs/datasets/fashiongen/defaults.yaml"
 
 
+@registry.register_builder("fashiongen_cls")
+class FashionGenBuilder(MMFDatasetBuilder):
+    def __init__(
+        self, dataset_name="fashiongen_cls", dataset_class=FashionGenDataset, *args, **kwargs
+    ):
+        super().__init__(dataset_name, dataset_class, *args, **kwargs)
+
+    @classmethod
+    def config_path(cls):
+        return "configs/datasets/fashiongen/classification.yaml"
+
+
 @registry.register_builder("fashion200k")
 class Fashion200kBuilder(MMFDatasetBuilder):
     def __init__(
