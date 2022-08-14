@@ -62,6 +62,7 @@ class FashionCLIPBaseModel(nn.Module):
         if (
             hasattr(sample_list, key)
             and sample_list[key] is not None
+            and isinstance(sample_list[key], torch.Tensor)
             and sample_list[key].dim() > dim
         ):
             sample_list[key] = torch.flatten(sample_list[key], end_dim=-dim)
