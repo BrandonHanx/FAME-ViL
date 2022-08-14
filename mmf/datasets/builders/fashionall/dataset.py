@@ -170,6 +170,26 @@ class FashionGenDataset(FashionDataset):
         )
 
 
+class FashionGenCLSDataset(FashionDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "fashiongen_cls",
+            config,
+            dataset_type,
+            index,
+            FashionGenDatabase,
+            *args,
+            **kwargs,
+        )
+
+
 class Fashion200kDataset(FashionDataset):
     def __init__(
         self,

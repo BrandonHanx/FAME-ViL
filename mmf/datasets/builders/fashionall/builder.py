@@ -1,5 +1,5 @@
 from mmf.common.registry import registry
-from .dataset import FashionAllDataset, FashionGenDataset, Fashion200kDataset, BigFACADDataset, PolyvoreOutfitsDataset
+from .dataset import FashionAllDataset, FashionGenDataset, FashionGenCLSDataset, Fashion200kDataset, BigFACADDataset, PolyvoreOutfitsDataset
 from mmf.datasets.mmf_dataset_builder import MMFDatasetBuilder
 
 
@@ -18,7 +18,7 @@ class FashionGenBuilder(MMFDatasetBuilder):
 @registry.register_builder("fashiongen_cls")
 class FashionGenBuilder(MMFDatasetBuilder):
     def __init__(
-        self, dataset_name="fashiongen_cls", dataset_class=FashionGenDataset, *args, **kwargs
+        self, dataset_name="fashiongen_cls", dataset_class=FashionGenCLSDataset, *args, **kwargs
     ):
         super().__init__(dataset_name, dataset_class, *args, **kwargs)
 

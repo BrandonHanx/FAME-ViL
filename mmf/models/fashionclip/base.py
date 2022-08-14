@@ -59,7 +59,11 @@ class FashionCLIPBaseModel(nn.Module):
     def _check_dim(
         self, sample_list: Dict[str, Tensor], key: str, dim: int
     ) -> Dict[str, Tensor]:
-        if hasattr(sample_list, key) and sample_list[key].dim() > dim:
+        if (
+            hasattr(sample_list, key)
+            and sample_list[key] is not None
+            and sample_list[key].dim() > dim
+        ):
             sample_list[key] = torch.flatten(sample_list[key], end_dim=-dim)
         return sample_list
 

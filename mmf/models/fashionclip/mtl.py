@@ -129,4 +129,5 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         self._check_dim(sample_list, "image_id", 1)
         self._check_dim(sample_list, "input_ids", 2)
         self._check_dim(sample_list, "attention_mask", 2)
+        self._check_dim(sample_list, "targets", 1)
         return sample_list
