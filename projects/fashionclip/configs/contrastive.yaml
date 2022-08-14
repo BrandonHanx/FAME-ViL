@@ -8,6 +8,16 @@ model_config:
     training_head_type: mtl
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
+    adapter_config:
+      freeze: false
+      adapter_name: scaled_pa
+      bottleneck: 64
+      dropout: 0.0
+      enable_xattn: false
+      share_cross: false
+      share_adapter: false
+      cross_dropout: 0.0
+    lr_multiplier: 100
     tasks:
     - itc
 
@@ -35,7 +45,7 @@ evaluation:
     - fashiongen
 
 training:
-  experiment_name: fashionclip_fashiongen_itc
+  experiment_name: fashionclip_fashiongen_itc_alltrain
   batch_size: 64
   lr_scheduler: true
   max_updates: 30000
