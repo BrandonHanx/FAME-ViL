@@ -76,6 +76,7 @@ class NASAdapter(nn.Module):
         adapter_name_list=None,
         initial_tau=1.0,
         gamma=0.998,
+        hard=True,
     ):
         super().__init__()
         self.adapters = nn.ModuleList(
@@ -89,19 +90,24 @@ class NASAdapter(nn.Module):
                 self.controller[name] = nn.Parameter(torch.rand(num_adapters))
         self.tau = initial_tau
         self.gamma = gamma
+        self.hard = hard
 
     def forward(self, x, task_name=None):
         if self.training:
             if isinstance(self.controller, nn.ParameterDict) and task_name is not None:
                 probs = F.gumbel_softmax(
-                    self.controller[task_name], tau=self.tau, hard=False
+                    self.controller[task_name], tau=self.tau, hard=self.hard
                 )
             else:
-                probs = F.gumbel_softmax(self.controller, tau=self.tau, hard=False)
-            x = torch.stack(
-                [a(x) * probs[i] for i, a in enumerate(self.adapters)]
-            )  # soft version
-            x = torch.sum(x, dim=0)
+                probs = F.gumbel_softmax(self.controller, tau=self.tau, hard=self.hard)
+            if self.hard:
+                index = torch.argmax(probs)
+                x = self.adapters[index](x) * probs[index]
+            else:
+                x = torch.stack(
+                    [a(x) * probs[i] for i, a in enumerate(self.adapters)]
+                )  # soft version
+                x = torch.sum(x, dim=0)
             self.tau = self.tau * self.gamma  # exponential decay
             return x
         if isinstance(self.controller, nn.ParameterDict) and task_name is not None:
