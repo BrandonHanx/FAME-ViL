@@ -18,6 +18,7 @@ from transformers.modeling_clip import (
     _expand_mask,
 )
 
+from .modeling_adapter import Adapter, ConvPass, NASAdapter
 from .modeling_clip import (
     _CLIPEncoder,
     _CLIPTextTransformer,
@@ -49,125 +50,6 @@ class CLIPAdapterConfig:
         self.share_cross = share_cross
         self.share_adapter = share_adapter
         self.adapter_name_list = adapter_name_list
-
-
-class Adapter(nn.Module):
-    def __init__(
-        self,
-        d_model,
-        bottleneck,
-        dropout=0.0,
-        adapter_scalar="learnable_scalar",
-        adapter_layernorm_option="in",
-    ):
-        super().__init__()
-        self.n_embd = d_model
-        self.down_size = bottleneck
-
-        # _before
-        self.adapter_layernorm_option = adapter_layernorm_option
-
-        self.adapter_layer_norm_before = None
-        if adapter_layernorm_option == "in" or adapter_layernorm_option == "out":
-            self.adapter_layer_norm_before = nn.LayerNorm(self.n_embd)
-
-        if adapter_scalar == "learnable_scalar":
-            self.scale = nn.Parameter(torch.ones(1))
-        else:
-            self.scale = float(adapter_scalar)
-
-        self.down_proj = nn.Linear(self.n_embd, self.down_size)
-        self.non_linear_func = nn.ReLU()
-        self.up_proj = nn.Linear(self.down_size, self.n_embd)
-
-        self.dropout = dropout
-        with torch.no_grad():
-            nn.init.kaiming_uniform_(self.down_proj.weight, a=math.sqrt(5))
-            nn.init.zeros_(self.up_proj.weight)
-            nn.init.zeros_(self.down_proj.bias)
-            nn.init.zeros_(self.up_proj.bias)
-
-    def forward(self, x, add_residual=True, residual=None):
-        residual = x if residual is None else residual
-        if self.adapter_layernorm_option == "in":
-            x = self.adapter_layer_norm_before(x)
-
-        down = self.down_proj(x)
-        down = self.non_linear_func(down)
-        down = F.dropout(down, p=self.dropout, training=self.training)
-        up = self.up_proj(down)
-
-        up = up * self.scale
-
-        if self.adapter_layernorm_option == "out":
-            up = self.adapter_layer_norm_before(up)
-
-        if add_residual:
-            output = up + residual
-        else:
-            output = up
-
-        return output
-
-
-class ConvPass(nn.Module):
-    def __init__(
-        self,
-        d_model,
-        bottleneck,
-        adapter_scalar="learnable_scalar",
-        adapter_layernorm_option="in",
-    ):
-        super().__init__()
-        self.n_embd = d_model
-        self.down_size = bottleneck
-
-        # _before
-        self.adapter_layernorm_option = adapter_layernorm_option
-
-        self.adapter_layer_norm_before = None
-        if adapter_layernorm_option == "in" or adapter_layernorm_option == "out":
-            self.adapter_layer_norm_before = nn.LayerNorm(self.n_embd)
-
-        if adapter_scalar == "learnable_scalar":
-            self.scale = nn.Parameter(torch.ones(1))
-        else:
-            self.scale = float(adapter_scalar)
-
-        self.down_conv = nn.Conv1d(self.n_embd, self.down_size, 1, stride=1, padding=0)
-        self.non_linear_func = nn.GELU()
-        self.in_conv = nn.Conv2d(self.down_size, self.down_size, 3, stride=1, padding=1)
-        self.up_conv = nn.Conv1d(self.down_size, self.n_embd, 1, stride=1, padding=0)
-
-    def forward(self, x, add_residual=True, residual=None):
-        residual = x if residual is None else residual
-        if self.adapter_layernorm_option == "in":
-            x = self.adapter_layer_norm_before(x)
-
-        b, _, d = x.shape
-        down = self.down_conv(x.reshape(b, d, -1))
-        down = self.non_linear_func(down)
-        down_cls = self.in_conv(down[:, :, 0].reshape(b, self.down_size, 1, 1)).squeeze(
-            -1
-        )
-        down_ctx = self.in_conv(
-            down[:, :, 1:].reshape(b, self.down_size, 14, 14)
-        ).reshape(b, self.down_size, -1)
-        down = torch.cat([down_cls, down_ctx], dim=2)
-        down = self.non_linear_func(down)
-        up = self.up_conv(down).reshape(b, -1, d)
-
-        up = up * self.scale
-
-        if self.adapter_layernorm_option == "out":
-            up = self.adapter_layer_norm_before(up)
-
-        if add_residual:
-            output = up + residual
-        else:
-            output = up
-
-        return output
 
 
 class CLIPCrossAttention(nn.Module):
@@ -260,6 +142,14 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     self.embed_dim,
                     self.adapter_config.bottleneck,
                 )
+            elif self.adapter_config.adapter_name == "nas_adapter":
+                self.adapt_mlp = NASAdapter(
+                    self.embed_dim,
+                    self.adapter_config.bottleneck,
+                    self.adapter_config.dropout,
+                    num_adapters=len(self.adapter_config.adapter_name_list),
+                    adapter_name_list=self.adapter_config.adapter_name_list,
+                )
             else:
                 if len(self.adapter_config.adapter_name_list) > 0:
                     self.adapt_mlp = nn.ModuleDict()
@@ -331,14 +221,14 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
     def forward_adaptmlp(
         self, hidden_states: torch.Tensor, task_name: str = None
     ) -> torch.FloatTensor:
-        if task_name is not None and isinstance(self.adapt_mlp, nn.ModuleDict):
-            adapt_hidden_states = self.adapt_mlp[task_name](
-                hidden_states, add_residual=False
-            )
+        if self.adapter_config.adapter_name == "nas_adapter":
+            adapt_hidden_states = self.adapt_mlp(hidden_states, task_name)
         else:
-            adapt_hidden_states = self.adapt_mlp(hidden_states, add_residual=False)
-        hidden_states = self.layer_norm2(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+            if task_name is not None and isinstance(self.adapt_mlp, nn.ModuleDict):
+                adapt_hidden_states = self.adapt_mlp[task_name](hidden_states)
+            else:
+                adapt_hidden_states = self.adapt_mlp(hidden_states)
+        hidden_states = self.forward_originmlp(hidden_states)
         return hidden_states + adapt_hidden_states
 
     def forward_mlp(
