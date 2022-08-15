@@ -1,0 +1,88 @@
+# FashionIQ data nums: 18000
+# FashionGen data nums: 60147
+
+includes:
+- ./fashioniq_dataset_cfg.yaml
+- ./fashiongen_dataset_cfg.yaml
+- ./fashiongen_cls_dataset_cfg.yaml
+
+model_config:
+  fashionclip:
+    training_head_type: mtl
+    tasks:
+    - itc
+    - tgir
+    - scr
+    clip_config:
+      clip_model_name: openai/clip-vit-base-patch16
+    adapter_config:
+      freeze: false
+      adapter_name: nas_adapter
+      bottleneck: 64
+      dropout: 0.0
+      enable_xattn: false
+      share_cross: false
+      share_adapter: false
+      cross_dropout: 0.0
+      adapter_name_list:
+      - itc
+      - tgir
+      - scr
+    lr_multiplier: 100
+    num_labels: 121
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: false
+    lr_steps:
+    - 35000
+    lr_ratio: 0.1
+    warmup_iterations: 2810
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-6
+    eps: 1e-8
+    weight_decay: 0.0
+
+evaluation:
+  metrics:
+  - type: r@k_fashioniq
+    datasets:
+    - fashioniq
+  - type: r@k_general
+    datasets:
+    - fashiongen
+  - type: accuracy
+    datasets:
+    - fashiongen_cls
+  - type: macro_f1
+    datasets:
+    - fashiongen_cls
+
+training:
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_nas
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 50000
+  log_interval: 10
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  find_unused_parameters: true
+  # update_frequency: 2
+  # accumulate_feilds: false
+  # buffer_gradients: true
+  early_stop:
+    criteria: fashioniq/r@k_fashioniq/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
+
+multitasking:
+  enabled: true
+  type: size_proportional
