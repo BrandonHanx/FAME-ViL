@@ -17,12 +17,12 @@ model_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
       freeze: false
-      adapter_name: nas_adapter
+      adapter_name: nas_adapter_pool
       bottleneck: 64
       dropout: 0.0
       enable_xattn: false
       share_cross: false
-      share_adapter: false
+      share_adapter: true
       cross_dropout: 0.0
       adapter_name_list:
       - itc
@@ -64,7 +64,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_nas
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool
   batch_size: 64
   lr_scheduler: true
   max_updates: 50000

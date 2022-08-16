@@ -18,7 +18,7 @@ from transformers.modeling_clip import (
     _expand_mask,
 )
 
-from .modeling_adapter import Adapter, ConvPass, NASAdapter
+from .modeling_adapter import Adapter, ConvPass, NASAdapter, NASAdapterPool
 from .modeling_clip import (
     _CLIPEncoder,
     _CLIPTextTransformer,
@@ -150,6 +150,14 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     num_adapters=len(self.adapter_config.adapter_name_list),
                     adapter_name_list=self.adapter_config.adapter_name_list,
                 )
+            elif self.adapter_config.adapter_name == "nas_adapter_pool":
+                self.adapt_mlp = NASAdapterPool(
+                    self.embed_dim,
+                    self.adapter_config.bottleneck,
+                    self.adapter_config.dropout,
+                    num_adapters=len(self.adapter_config.adapter_name_list),
+                    adapter_name_list=self.adapter_config.adapter_name_list,
+                )
             else:
                 if len(self.adapter_config.adapter_name_list) > 0:
                     self.adapt_mlp = nn.ModuleDict()
@@ -221,7 +229,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
     def forward_adaptmlp(
         self, hidden_states: torch.Tensor, task_name: str = None
     ) -> torch.FloatTensor:
-        if self.adapter_config.adapter_name == "nas_adapter":
+        if "nas_adapter" in self.adapter_config.adapter_name:
             adapt_hidden_states = self.adapt_mlp(hidden_states, task_name)
         else:
             if task_name is not None and isinstance(self.adapt_mlp, nn.ModuleDict):
@@ -282,8 +290,14 @@ class CLIPEncoderWithAdapter(_CLIPEncoder):
         )
         if adapter_config is not None:
             if adapter_config.share_adapter:
-                for i in range(config.num_hidden_layers):
-                    self.layers[i].adapt_mlp = self.layers[0].adapt_mlp
+                if "nas_adapter" in adapter_config.adapter_name:
+                    for i in range(config.num_hidden_layers):
+                        self.layers[i].adapt_mlp.adapters = self.layers[
+                            0
+                        ].adapt_mlp.adapters
+                else:
+                    for i in range(config.num_hidden_layers):
+                        self.layers[i].adapt_mlp = self.layers[0].adapt_mlp
             if adapter_config.share_cross:
                 for i in range(config.num_hidden_layers):
                     self.layers[i].cross_attn = self.layers[0].cross_attn

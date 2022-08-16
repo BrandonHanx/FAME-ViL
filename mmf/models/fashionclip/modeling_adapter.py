@@ -108,13 +108,27 @@ class NASAdapter(nn.Module):
                     [a(x) * probs[i] for i, a in enumerate(self.adapters)]
                 )  # soft version
                 x = torch.sum(x, dim=0)
-            self.tau = self.tau * self.gamma  # exponential decay
+            self.tau = max(self.tau * self.gamma, 1e-8)  # exponential decay
             return x
         if isinstance(self.controller, nn.ParameterDict) and task_name is not None:
             index = torch.argmax(self.controller[task_name])
         else:
             index = torch.argmax(self.controller)
         return self.adapters[index](x)
+
+
+class NASAdapterPool(NASAdapter):
+    def __init__(self, *args, **kwargs):
+        d_model, _, dropout = args
+        kwargs["num_adapters"] = 36
+        super().__init__(*args, **kwargs)
+        adapters = []
+        # Manually design candidate pool
+        for i in range(12):
+            adapters.append(Adapter(d_model, 16, dropout))
+            adapters.append(Adapter(d_model, 32, dropout))
+            adapters.append(Adapter(d_model, 64, dropout))
+        self.adapters = nn.ModuleList(adapters)
 
 
 class ConvPass(nn.Module):
