@@ -30,6 +30,8 @@ model_config:
       - scr
     lr_multiplier: 100
     num_labels: 121
+    freeze_task_list:
+    - tgir
 
 scheduler:
   type: multi_step
@@ -64,7 +66,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_tgirfreeze
   batch_size: 64
   lr_scheduler: true
   max_updates: 50000

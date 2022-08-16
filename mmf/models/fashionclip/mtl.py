@@ -17,6 +17,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
     def __init__(self, config):
         super().__init__(config.clip_config, config.get("adapter_config", None))
         self.tasks = config.tasks
+        self.freeze_task_list = config.get("freeze_task_list", [])
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
         self.config = config
@@ -48,7 +49,16 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         flattened = self.flatten(sample_list, to_be_flattened, to_be_flattened_dim)
         return flattened
 
+    def freeze_with_task(self, task_name):
+        if self.training:
+            if task_name in self.freeze_task_list:
+                self.clip.freeze()
+            else:
+                if len(self.freeze_task_list) > 0:
+                    self.clip.unfreeze()
+
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self.freeze_with_task("itc")
         visual_embeddings = self.clip.get_image_features(
             sample_list.image, task_name="itc"
         )
@@ -71,6 +81,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         return output_dict
 
     def _forward_tgir(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self.freeze_with_task("tgir")
         tar_embeddings = self.clip.get_image_features(
             sample_list.tar_image, task_name="tgir"
         )
@@ -97,6 +108,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         return output_dict
 
     def _forward_scr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self.freeze_with_task("scr")
         visual_embeddings = self.clip.get_image_features(
             sample_list.image, task_name="scr"
         )

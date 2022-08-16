@@ -27,6 +27,16 @@ from .modeling_clip import (
 )
 
 
+def _freeze(module):
+    for p in module.parameters():
+        p.requires_grad = False
+
+
+def _unfreeze(module):
+    for p in module.parameters():
+        p.requires_grad = True
+
+
 @dataclass
 class CLIPAdapterConfig:
     def __init__(
@@ -179,16 +189,17 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     config, 768 if config.hidden_size == 512 else 512
                 )
 
-    @staticmethod
-    def _freeze(module):
-        for p in module.parameters():
-            p.requires_grad = False
-
     def freeze(self):
-        self._freeze(self.self_attn)
-        self._freeze(self.layer_norm1)
-        self._freeze(self.mlp)
-        self._freeze(self.layer_norm2)
+        _freeze(self.self_attn)
+        _freeze(self.layer_norm1)
+        _freeze(self.mlp)
+        _freeze(self.layer_norm2)
+
+    def unfreeze(self):
+        _unfreeze(self.self_attn)
+        _unfreeze(self.layer_norm1)
+        _unfreeze(self.mlp)
+        _unfreeze(self.layer_norm2)
 
     def forward_self_attn(
         self,
@@ -303,6 +314,14 @@ class CLIPEncoderWithAdapter(_CLIPEncoder):
                     self.layers[i].cross_attn = self.layers[0].cross_attn
         self.gradient_checkpointing = False
 
+    def freeze(self):
+        for x in self.layers:
+            x.freeze()
+
+    def unfreeze(self):
+        for x in self.layers:
+            x.unfreeze()
+
 
 class CLIPTextTransformerWithAdapter(_CLIPTextTransformer):
     def __init__(
@@ -319,14 +338,15 @@ class CLIPTextTransformerWithAdapter(_CLIPTextTransformer):
             if adapter_config.freeze:
                 self.freeze()
 
-    @staticmethod
-    def _freeze(module):
-        for p in module.parameters():
-            p.requires_grad = False
-
     def freeze(self):
-        self._freeze(self.embeddings)
-        self._freeze(self.final_layer_norm)
+        self.encoder.freeze()
+        _freeze(self.embeddings)
+        _freeze(self.final_layer_norm)
+
+    def unfreeze(self):
+        self.encoder.unfreeze()
+        _unfreeze(self.embeddings)
+        _unfreeze(self.final_layer_norm)
 
 
 class CLIPVisionTransformerWithAdapter(_CLIPVisionTransformer):
@@ -346,15 +366,17 @@ class CLIPVisionTransformerWithAdapter(_CLIPVisionTransformer):
             if adapter_config.freeze:
                 self.freeze()
 
-    @staticmethod
-    def _freeze(module):
-        for p in module.parameters():
-            p.requires_grad = False
-
     def freeze(self):
-        self._freeze(self.embeddings)
-        self._freeze(self.pre_layrnorm)
-        self._freeze(self.post_layernorm)
+        self.encoder.freeze()
+        _freeze(self.embeddings)
+        _freeze(self.pre_layrnorm)
+        _freeze(self.post_layernorm)
+
+    def unfreeze(self):
+        self.encoder.unfreeze()
+        _unfreeze(self.embeddings)
+        _unfreeze(self.pre_layrnorm)
+        _unfreeze(self.post_layernorm)
 
 
 class CLIPModelWithAdapter(_CLIPModel):
@@ -396,15 +418,19 @@ class CLIPModelWithAdapter(_CLIPModel):
             if adapter_config.freeze:
                 self.freeze()
 
-    @staticmethod
-    def _freeze(module):
-        for p in module.parameters():
-            p.requires_grad = False
-
     def freeze(self):
-        self._freeze(self.visual_projection)
-        self._freeze(self.text_projection)
+        self.text_model.freeze()
+        self.vision_model.freeze()
+        _freeze(self.visual_projection)
+        _freeze(self.text_projection)
         self.logit_scale.requires_grad = False
+
+    def unfreeze(self):
+        self.text_model.unfreeze()
+        self.vision_model.unfreeze()
+        _unfreeze(self.visual_projection)
+        _unfreeze(self.text_projection)
+        self.logit_scale.requires_grad = True
 
     def get_cross_attn_features(
         self,
