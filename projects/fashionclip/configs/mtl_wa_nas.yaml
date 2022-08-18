@@ -34,6 +34,7 @@ model_config:
       - scr
     lr_multiplier: 100
     num_labels: 121
+    sparsity_regularization: true
 
 scheduler:
   type: multi_step
@@ -68,7 +69,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool_scale
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool_scale_entr
   batch_size: 64
   lr_scheduler: true
   max_updates: 50000

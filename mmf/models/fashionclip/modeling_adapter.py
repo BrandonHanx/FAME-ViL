@@ -75,7 +75,7 @@ class NASAdapter(nn.Module):
         num_adapters=2,
         adapter_name_list=None,
         initial_tau=1.0,
-        gamma=0.998,
+        gamma=0.9999,
         hard=True,
     ):
         super().__init__()
@@ -91,6 +91,13 @@ class NASAdapter(nn.Module):
         self.tau = initial_tau
         self.gamma = gamma
         self.hard = hard
+
+    def get_controller_entropy(self, task_name=None):
+        if isinstance(self.controller, nn.ParameterDict) and task_name is not None:
+            entropy = torch.special.entr(F.softmax(self.controller[task_name]))
+        else:
+            entropy = torch.special.entr(F.softmax(self.controller))
+        return torch.mean(entropy)
 
     def forward(self, x, task_name=None):
         if self.training:
@@ -108,7 +115,7 @@ class NASAdapter(nn.Module):
                     [a(x) * probs[i] for i, a in enumerate(self.adapters)]
                 )  # soft version
                 x = torch.sum(x, dim=0)
-            self.tau = max(self.tau * self.gamma, 1e-8)  # exponential decay
+            self.tau = max(self.tau * self.gamma, 0.01)  # exponential decay
             return x
         if isinstance(self.controller, nn.ParameterDict) and task_name is not None:
             index = torch.argmax(self.controller[task_name])
