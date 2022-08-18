@@ -17,6 +17,8 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
     def __init__(self, config):
         super().__init__(config.clip_config, config.get("adapter_config", None))
         self.tasks = config.tasks
+        scales = config.get("loss_scales", [1.0] * len(self.tasks))
+        self.loss_scales = dict(zip(self.tasks, scales))
         self.freeze_task_list = config.get("freeze_task_list", [])
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
@@ -75,7 +77,9 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         }
 
         loss = {}
-        loss["itc_loss"] = self.loss_funcs["itc"](sample_list, output_dict)
+        loss["itc_loss"] = (
+            self.loss_funcs["itc"](sample_list, output_dict) * self.loss_scales["itc"]
+        )
         output_dict["losses"] = loss
 
         return output_dict
@@ -102,7 +106,9 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         }
 
         loss = {}
-        loss["tgir_loss"] = self.loss_funcs["tgir"](sample_list, output_dict)
+        loss["tgir_loss"] = (
+            self.loss_funcs["tgir"](sample_list, output_dict) * self.loss_scales["tgir"]
+        )
         output_dict["losses"] = loss
 
         return output_dict
@@ -123,7 +129,9 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         }
 
         loss = {}
-        loss["scr_loss"] = self.loss_funcs["scr"](sample_list, output_dict)
+        loss["scr_loss"] = (
+            self.loss_funcs["scr"](sample_list, output_dict) * self.loss_scales["scr"]
+        )
         output_dict["losses"] = loss
 
         return output_dict

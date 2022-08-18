@@ -13,6 +13,10 @@ model_config:
     - itc
     - tgir
     - scr
+    loss_scales:
+    - 2.0
+    - 0.5
+    - 1.0
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
@@ -64,7 +68,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool_scale
   batch_size: 64
   lr_scheduler: true
   max_updates: 50000
