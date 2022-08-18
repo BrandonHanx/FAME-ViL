@@ -1,11 +1,11 @@
 # FashionIQ data nums: 18000
+
 includes:
 - fashioniq_dataset_cfg.yaml
 
 model_config:
   fashionclip:
-    training_head_type: composition
-    comp_mode: va
+    training_head_type: mtl
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
@@ -18,8 +18,8 @@ model_config:
       share_adapter: false
       cross_dropout: 0.0
     lr_multiplier: 100
-    losses:
-      - type: bbc_loss
+    tasks:
+    - tgir
 
 scheduler:
   type: multi_step
@@ -34,7 +34,7 @@ scheduler:
 optimizer:
   type: adam_w
   params:
-    lr: 1e-6
+    lr: 1e-7
     eps: 1e-8
     weight_decay: 0.0
 
