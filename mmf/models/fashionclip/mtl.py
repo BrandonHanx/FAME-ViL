@@ -88,7 +88,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         loss["itc_loss"] = (
             self.loss_funcs["itc"](sample_list, output_dict) * self.loss_scales["itc"]
         )
-        if self.config.sparsity_regularization:
+        if self.config.get("sparsity_regularization", False):
             loss["itc_sparsity_loss"] = self.get_sparsity_regularization("itc")
         output_dict["losses"] = loss
 
@@ -119,7 +119,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         loss["tgir_loss"] = (
             self.loss_funcs["tgir"](sample_list, output_dict) * self.loss_scales["tgir"]
         )
-        if self.config.sparsity_regularization:
+        if self.config.get("sparsity_regularization", False):
             loss["tgir_sparsity_loss"] = self.get_sparsity_regularization("tgir")
         output_dict["losses"] = loss
 
@@ -144,7 +144,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         loss["scr_loss"] = (
             self.loss_funcs["scr"](sample_list, output_dict) * self.loss_scales["scr"]
         )
-        if self.config.sparsity_regularization:
+        if self.config.get("sparsity_regularization", False):
             loss["scr_sparsity_loss"] = self.get_sparsity_regularization("scr")
         output_dict["losses"] = loss
 
