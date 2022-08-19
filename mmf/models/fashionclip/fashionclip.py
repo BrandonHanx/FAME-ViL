@@ -33,7 +33,7 @@ class FashionCLIP(BaseModel):
     def get_optimizer_parameters(self, config):
         base_lr = config.optimizer.params.lr
         weight_decay = config.optimizer.params.weight_decay
-        lr_multiplier = self.config.lr_multiplier
+        lr_multiplier = self.config.get("lr_multiplier", 1.0)
 
         print(self.model.state_dict().keys())
 
