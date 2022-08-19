@@ -13,6 +13,10 @@ model_config:
     - itc
     - tgir
     - scr
+    loss_scales:
+    - 2.0
+    - 0.75
+    - 1.0
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
@@ -36,7 +40,7 @@ scheduler:
   params:
     use_warmup: false
     lr_steps:
-    - 35000
+    - 40000
     lr_ratio: 0.1
     warmup_iterations: 2810
     warmup_factor: 0.25
@@ -46,7 +50,7 @@ optimizer:
   params:
     lr: 1e-6
     eps: 1e-8
-    weight_decay: 0.0
+    weight_decay: 1e-5
 
 evaluation:
   metrics:
@@ -64,10 +68,10 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_ratio
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_scale
   batch_size: 64
   lr_scheduler: true
-  max_updates: 50000
+  max_updates: 60000
   log_interval: 10
   checkpoint_interval: 1000
   evaluation_interval: 1000
@@ -85,9 +89,4 @@ run_type: train_val
 
 multitasking:
   enabled: true
-  type: ratios
-  params:
-    sampling_ratios:
-      fashiongen: 0.5
-      fashiongen_cls: 0.4
-      fashioniq: 0.1
+  type: size_proportional
