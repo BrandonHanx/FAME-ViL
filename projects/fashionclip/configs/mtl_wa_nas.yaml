@@ -13,15 +13,11 @@ model_config:
     - itc
     - tgir
     - scr
-    loss_scales:
-    - 2.0
-    - 0.5
-    - 1.0
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
-      freeze: false
-      adapter_name: nas_adapter_pool
+      freeze: true
+      adapter_name: nas_adapter
       bottleneck: 64
       dropout: 0.0
       enable_xattn: false
@@ -41,7 +37,7 @@ scheduler:
   params:
     use_warmup: false
     lr_steps:
-    - 35000
+    - 40000
     lr_ratio: 0.1
     warmup_iterations: 2810
     warmup_factor: 0.25
@@ -69,10 +65,10 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_naspool_scale_entr
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_nas_soft_entr
   batch_size: 64
   lr_scheduler: true
-  max_updates: 50000
+  max_updates: 60000
   log_interval: 10
   checkpoint_interval: 1000
   evaluation_interval: 1000

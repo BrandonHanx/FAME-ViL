@@ -76,7 +76,7 @@ class NASAdapter(nn.Module):
         adapter_name_list=None,
         initial_tau=1.0,
         gamma=0.9999,
-        hard=True,
+        hard=False,
     ):
         super().__init__()
         self.adapters = nn.ModuleList(
