@@ -47,7 +47,7 @@ def imtlg(p_grad, name, gradient_list):
 
 
 def ogd(p_grad, name, gradient_dict):
-    if p_grad is None:
+    if p_grad is None or not torch.any(p_grad):
         return p_grad
     operate_task = gradient_dict["operate_task"]
     regular_grads = []
@@ -59,8 +59,10 @@ def ogd(p_grad, name, gradient_dict):
             regular_grads.append(v[name])
     for regular_grad in regular_grads:
         regular_grad_norm = regular_grad / torch.linalg.norm(regular_grad)
-        p_grad = p_grad - regular_grad_norm * torch.dot(
-            p_grad.flatten(), regular_grad_norm.flatten()
-        )
+        p_grad_norm = p_grad / torch.linalg.norm(p_grad)
+        if torch.dot(p_grad_norm.flatten(), regular_grad_norm.flatten()) < 0:
+            p_grad = p_grad - regular_grad_norm * torch.dot(
+                p_grad.flatten(), regular_grad_norm.flatten()
+            )
     gradient_dict[operate_task][name] = p_grad
     return p_grad
