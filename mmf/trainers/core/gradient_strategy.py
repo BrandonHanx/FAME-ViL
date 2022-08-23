@@ -44,3 +44,23 @@ def imtlg(p_grad, name, gradient_list):
     alpha_ = torch.matmul(first_element, second_element)
     alpha = torch.stack(((1 - alpha_.sum()).unsqueeze(-1), alpha_))
     return torch.sum(G * alpha, dim=0).reshape(p_grad.shape)
+
+
+def ogd(p_grad, name, gradient_dict):
+    if p_grad is None:
+        return p_grad
+    operate_task = gradient_dict["operate_task"]
+    regular_grads = []
+    for k, v in gradient_dict.items():
+        if k == operate_task or k == "operate_task":
+            continue
+        regular_grad = v.get(name, None)
+        if regular_grad is not None and torch.any(regular_grad):
+            regular_grads.append(v[name])
+    for regular_grad in regular_grads:
+        regular_grad_norm = regular_grad / torch.linalg.norm(regular_grad)
+        p_grad = p_grad - regular_grad_norm * torch.dot(
+            p_grad.flatten(), regular_grad_norm.flatten()
+        )
+    gradient_dict[operate_task][name] = p_grad
+    return p_grad

@@ -3,7 +3,7 @@
 import gc
 import logging
 from abc import ABC
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import mmf.trainers.core.gradient_strategy as gradient_strategy
 import torch
@@ -25,7 +25,7 @@ class TrainerTrainingLoopMixin(ABC):
     current_iteration: int = 0
     num_updates: int = 0
     meter: Meter = Meter()
-    gradients: List = []
+    gradients: Dict = dict()
 
     def training_loop(self) -> None:
         self.max_updates = self._calculate_max_updates()
@@ -189,7 +189,8 @@ class TrainerTrainingLoopMixin(ABC):
             grads = {}
             for n, p in self.model.named_parameters():
                 grads[n] = p.grad.clone() if p.grad is not None else None
-            self.gradients.append(grads)
+            self.gradients[batch.dataset_name] = grads
+            self.gradients["operate_task"] = batch.dataset_name
             self.optimizer.zero_grad()
         return report
 
@@ -238,13 +239,16 @@ class TrainerTrainingLoopMixin(ABC):
     def _finish_update(self):
         if self.training_config.buffer_gradients:
             for n, p in self.model.named_parameters():
+                # FIXME: only OGD is available now
                 if self.training_config.gradient_strategy == "sum":
                     p.grad = gradient_strategy.sum(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "imtlg":
                     p.grad = gradient_strategy.imtlg(p.grad, n, self.gradients)
+                elif self.training_config.gradient_strategy == "ogd":
+                    p.grad = gradient_strategy.ogd(p.grad, n, self.gradients)
                 else:
                     raise NotImplementedError
-            self.gradients = []
+            # self.gradients = []
         if self.training_config.clip_gradients:
             clip_gradients(
                 self.model,
