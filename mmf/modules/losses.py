@@ -807,6 +807,43 @@ class BatchBasedClassificationLoss(nn.Module):
         return loss
 
 
+@registry.register_loss("bbc_kd_loss")
+class BatchBasedClassificationLossKD(nn.Module):
+    def __init__(
+        self,
+        score_key="comp_feats",
+        target_key="tar_feats",
+        teacher_score_key="teacher_comp_feats",
+        teacher_target_key="teacher_tar_feats",
+    ):
+        super().__init__()
+        self.score_key = score_key
+        self.target_key = target_key
+        self.teacher_score_key = teacher_score_key
+        self.teacher_target_key = teacher_target_key
+
+    def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
+        ref_features = model_output[self.score_key]
+        tar_features = model_output[self.target_key]
+        teacher_ref_features = model_output[self.teacher_score_key]
+        teacher_tar_features = model_output[self.teacher_target_key]
+
+        tar_features_all_gpus = gather_tensor_along_batch_with_backward(tar_features)
+        logits = torch.matmul(ref_features, tar_features_all_gpus.transpose(0, 1))
+
+        teacher_tar_features_all_gpus = gather_tensor_along_batch_with_backward(
+            teacher_tar_features
+        )
+        teacher_logits = torch.matmul(
+            teacher_ref_features, teacher_tar_features_all_gpus.transpose(0, 1)
+        )
+        labels = F.softmax(teacher_logits, dim=1)
+
+        loss = -torch.sum(F.log_softmax(logits, dim=1) * labels, dim=1).mean()
+
+        return loss
+
+
 @registry.register_loss("contrastive_loss")
 class ContrastiveLoss(nn.Module):
     """

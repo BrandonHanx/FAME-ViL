@@ -9,6 +9,7 @@ from torch import Tensor
 
 from .composition import FashionCLIPForComposition
 from .mtl import FashionCLIPForMTL
+from .mtl_kd import FashionCLIPForMTLwithKD
 
 
 @registry.register_model("fashionclip")
@@ -27,6 +28,8 @@ class FashionCLIP(BaseModel):
             self.model = FashionCLIPForComposition(self.config)
         elif self.training_head_type == "mtl":
             self.model = FashionCLIPForMTL(self.config)
+        elif self.training_head_type == "mtl-kd":
+            self.model = FashionCLIPForMTLwithKD(self.config)
         else:
             raise NotImplementedError
 
