@@ -21,6 +21,18 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
         self.init_teachers()
         self.init_kd_losses()
 
+    @staticmethod
+    def _rename_state_dict(state_dict):
+        new_state_dict = dict()
+        for k, v in state_dict.items():
+            if k.startswith("module.model."):
+                new_state_dict[k[13:]] = v
+            elif k.startswith("model."):
+                new_state_dict[k[6:]] = v
+            else:
+                new_state_dict[k] = v
+        return new_state_dict
+
     def init_teachers(self):
         if self.config.get("itc_teacher_config", None) is not None:
             config = self.config.itc_teacher_config
@@ -29,6 +41,7 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
                 config.pretrained_path,
                 map_location=torch.device("cpu"),
             )
+            state_dict = self._rename_state_dict(state_dict)
             self.teachers["itc"].load_state_dict(state_dict)
             logger.info(
                 f"Successfully loaded ITC teacher from {config.pretrained_path}"
@@ -40,6 +53,7 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
                 config.pretrained_path,
                 map_location=torch.device("cpu"),
             )
+            state_dict = self._rename_state_dict(state_dict)
             self.teachers["tgir"].load_state_dict(state_dict)
             logger.info(
                 f"Successfully loaded TGIR teacher from {config.pretrained_path}"
@@ -51,6 +65,7 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
                 config.pretrained_path,
                 map_location=torch.device("cpu"),
             )
+            state_dict = self._rename_state_dict(state_dict)
             self.teachers["scr"].load_state_dict(state_dict)
             logger.info(
                 f"Successfully loaded SCR teacher from {config.pretrained_path}"
