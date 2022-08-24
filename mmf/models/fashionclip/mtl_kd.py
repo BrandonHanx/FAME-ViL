@@ -4,7 +4,11 @@ import logging
 from typing import Dict
 
 import torch
-from mmf.modules.losses import BatchBasedClassificationLossKD
+from mmf.modules.losses import (
+    BatchBasedClassificationLossKD,
+    ContrastiveLossKD,
+    SoftLabelCrossEntropyLoss,
+)
 from torch import Tensor, nn
 
 from .mtl import FashionCLIPForMTL
@@ -74,8 +78,23 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             p.requires_grad = False
 
     def init_kd_losses(self):
+        if "itc" in self.tasks:
+            self.kd_loss_funcs["itc"] = ContrastiveLossKD()
         if "tgir" in self.tasks:
             self.kd_loss_funcs["tgir"] = BatchBasedClassificationLossKD()
+        if "scr" in self.tasks:
+            self.kd_loss_funcs["scr"] = SoftLabelCrossEntropyLoss()
+
+    def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output_dict = super()._forward_itc(sample_list)
+        if self.training:
+            teacher_output_dict = self.teachers["itc"]._forward_itc(sample_list)
+            output_dict["teacher_scores"] = teacher_output_dict["scores"]
+            output_dict["teacher_targets"] = teacher_output_dict["targets"]
+            output_dict["losses"]["kd_itc_loss"] = self.kd_loss_funcs["itc"](
+                sample_list, output_dict
+            )
+        return output_dict
 
     def _forward_tgir(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output_dict = super()._forward_tgir(sample_list)
@@ -84,6 +103,16 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             output_dict["teacher_comp_feats"] = teacher_output_dict["comp_feats"]
             output_dict["teacher_tar_feats"] = teacher_output_dict["tar_feats"]
             output_dict["losses"]["kd_tgir_loss"] = self.kd_loss_funcs["tgir"](
+                sample_list, output_dict
+            )
+        return output_dict
+
+    def _forward_scr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output_dict = super()._forward_scr(sample_list)
+        if self.training:
+            teacher_output_dict = self.teachers["scr"]._forward_scr(sample_list)
+            sample_list["targets"] = teacher_output_dict["scores"]
+            output_dict["losses"]["kd_scr_loss"] = self.kd_loss_funcs["scr"](
                 sample_list, output_dict
             )
         return output_dict

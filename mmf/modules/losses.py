@@ -886,6 +886,59 @@ class ContrastiveLoss(nn.Module):
         return (loss_1 + loss_2) / 2
 
 
+@registry.register_loss("contrastive_kd_loss")
+class ContrastiveLossKD(nn.Module):
+    def __init__(self, temperature: Union[float, Tensor] = 1.0):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, sample_list: Dict[str, Tensor], model_output: Dict[str, Tensor]):
+        embedding_1 = model_output["scores"]
+        embedding_2 = model_output["targets"]
+        teacher_embedding_1 = model_output["teacher_scores"]
+        teacher_embedding_2 = model_output["teacher_targets"]
+
+        # FIXME: maybe we can donot use val loss
+        if embedding_1.size(0) != embedding_2.size(0):
+            return torch.tensor(0.0, device=embedding_1.device)
+
+        embedding_1_all_gpus = gather_tensor_along_batch_with_backward(embedding_1)
+        embedding_2_all_gpus = gather_tensor_along_batch_with_backward(embedding_2)
+        teacher_embedding_1_all_gpus = gather_tensor_along_batch_with_backward(
+            embedding_1
+        )
+        teacher_embedding_2_all_gpus = gather_tensor_along_batch_with_backward(
+            embedding_2
+        )
+
+        logits_1 = (
+            torch.matmul(embedding_1, embedding_2_all_gpus.transpose(0, 1))
+            / self.temperature
+        )
+        logits_2 = (
+            torch.matmul(embedding_2, embedding_1_all_gpus.transpose(0, 1))
+            / self.temperature
+        )
+        teacher_logits_1 = (
+            torch.matmul(
+                teacher_embedding_1, teacher_embedding_2_all_gpus.transpose(0, 1)
+            )
+            / self.temperature
+        )
+        teacher_logits_2 = (
+            torch.matmul(
+                teacher_embedding_2, teacher_embedding_1_all_gpus.transpose(0, 1)
+            )
+            / self.temperature
+        )
+        labels_1 = F.softmax(teacher_logits_1, dim=1)
+        labels_2 = F.softmax(teacher_logits_2, dim=1)
+        loss_1 = -torch.sum(F.log_softmax(logits_1, dim=1) * labels_1, dim=1).mean()
+        loss_2 = -torch.sum(F.log_softmax(logits_2, dim=1) * labels_2, dim=1).mean()
+
+        return (loss_1 + loss_2) / 2
+
+
 @registry.register_loss("supervised_contrastive_loss")
 class SupervisedContrastiveLoss(nn.Module):
     """
