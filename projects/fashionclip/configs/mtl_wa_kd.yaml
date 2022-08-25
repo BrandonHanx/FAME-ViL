@@ -62,6 +62,23 @@ model_config:
       tasks:
       - tgir
       pretrained_path: save/fashionclip_fashioniq_composition_alltrain/fashionclip_final.pth
+    scr_teacher_config:
+      training_head_type: mtl
+      clip_config:
+        clip_model_name: openai/clip-vit-base-patch16
+      adapter_config:
+        freeze: false
+        adapter_name: scaled_pa
+        bottleneck: 64
+        dropout: 0.0
+        enable_xattn: false
+        share_cross: false
+        share_adapter: false
+        cross_dropout: 0.0
+      tasks:
+      - scr
+      num_labels: 121
+      pretrained_path: save/fashionclip_fashiogen_scr_alltrain/fashionclip_final.pth
 
 scheduler:
   type: multi_step

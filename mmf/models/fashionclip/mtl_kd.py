@@ -7,6 +7,7 @@ import torch
 from mmf.modules.losses import (
     BatchBasedClassificationLossKD,
     ContrastiveLossKD,
+    SoftLabelCrossEntropyLoss,
 )
 from torch import Tensor, nn
 
@@ -61,18 +62,18 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             logger.info(
                 f"Successfully loaded TGIR teacher from {config.pretrained_path}"
             )
-        # if self.config.get("scr_teacher_config", None) is not None:
-        #     config = self.config.scr_teacher_config
-        #     self.teachers["scr"] = FashionCLIPForMTL(config)
-        #     state_dict = torch.load(
-        #         config.pretrained_path,
-        #         map_location=torch.device("cpu"),
-        #     )
-        #     state_dict = self._rename_state_dict(state_dict)
-        #     self.teachers["scr"].load_state_dict(state_dict)
-        #     logger.info(
-        #         f"Successfully loaded SCR teacher from {config.pretrained_path}"
-        #     )
+        if self.config.get("scr_teacher_config", None) is not None:
+            config = self.config.scr_teacher_config
+            self.teachers["scr"] = FashionCLIPForMTL(config)
+            state_dict = torch.load(
+                config.pretrained_path,
+                map_location=torch.device("cpu"),
+            )
+            state_dict = self._rename_state_dict(state_dict)
+            self.teachers["scr"].load_state_dict(state_dict)
+            logger.info(
+                f"Successfully loaded SCR teacher from {config.pretrained_path}"
+            )
         for p in self.teachers.parameters():
             p.requires_grad = False
 
@@ -81,8 +82,8 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             self.kd_loss_funcs["itc"] = ContrastiveLossKD()
         if "tgir" in self.tasks:
             self.kd_loss_funcs["tgir"] = BatchBasedClassificationLossKD()
-        # if "scr" in self.tasks:
-        #     self.kd_loss_funcs["scr"] = SoftLabelCrossEntropyLoss()
+        if "scr" in self.tasks:
+            self.kd_loss_funcs["scr"] = SoftLabelCrossEntropyLoss()
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output_dict = super()._forward_itc(sample_list)
@@ -106,12 +107,12 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             )
         return output_dict
 
-    # def _forward_scr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-    #     output_dict = super()._forward_scr(sample_list)
-    #     if self.training:
-    #         teacher_output_dict = self.teachers["scr"]._forward_scr(sample_list)
-    #         sample_list["targets"] = teacher_output_dict["scores"]
-    #         output_dict["losses"]["kd_scr_loss"] = self.kd_loss_funcs["scr"](
-    #             sample_list, output_dict
-    #         )
-    #     return output_dict
+    def _forward_scr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output_dict = super()._forward_scr(sample_list)
+        if self.training:
+            teacher_output_dict = self.teachers["scr"]._forward_scr(sample_list)
+            sample_list["targets"] = teacher_output_dict["scores"]
+            output_dict["losses"]["kd_scr_loss"] = self.kd_loss_funcs["scr"](
+                sample_list, output_dict
+            )
+        return output_dict
