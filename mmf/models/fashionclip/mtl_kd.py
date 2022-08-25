@@ -4,6 +4,7 @@ import logging
 from typing import Dict
 
 import torch
+import torch.nn.functional as F
 from mmf.modules.losses import (
     BatchBasedClassificationLossKD,
     ContrastiveLossKD,
@@ -111,7 +112,7 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
         output_dict = super()._forward_scr(sample_list)
         if self.training:
             teacher_output_dict = self.teachers["scr"]._forward_scr(sample_list)
-            sample_list["targets"] = teacher_output_dict["scores"]
+            sample_list["targets"] = F.softmax(teacher_output_dict["scores"], dim=-1)
             output_dict["losses"]["kd_scr_loss"] = self.kd_loss_funcs["scr"](
                 sample_list, output_dict
             )
