@@ -113,7 +113,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_kd_all
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_kd_ogdm
   batch_size: 64
   lr_scheduler: true
   max_updates: 60000
@@ -121,6 +121,10 @@ training:
   checkpoint_interval: 1000
   evaluation_interval: 1000
   find_unused_parameters: true
+  update_frequency: 1
+  accumulate_feilds: false
+  buffer_gradients: true
+  gradient_strategy: ogd
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false

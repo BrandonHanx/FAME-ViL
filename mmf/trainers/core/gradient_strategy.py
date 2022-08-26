@@ -64,5 +64,7 @@ def ogd(p_grad, name, gradient_dict):
                 p_grad = p_grad - regular_grad_norm * torch.dot(
                     p_grad.flatten(), regular_grad_norm.flatten()
                 )
-        gradient_dict[operate_task][name] = p_grad.clone()
+        gradient_dict[operate_task][name] = (
+            gradient_dict[operate_task][name] * 0.9 + p_grad.clone() * 0.1
+        )
     return p_grad
