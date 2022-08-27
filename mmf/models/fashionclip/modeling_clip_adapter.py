@@ -473,6 +473,11 @@ class CLIPModelWithAdapter(_CLIPModel):
                 t_hidden_states, self_attn_mask, causal_attention_mask
             )
 
+            v_hidden_states = v_residual + v_hidden_states
+            t_hidden_states = t_residual + t_hidden_states
+            v_residual = v_hidden_states
+            t_residual = t_hidden_states
+
             if random.random() < self.adapter_config.cross_dropout and self.training:
                 vt_hidden_states = 0
                 tv_hidden_states = 0
@@ -485,11 +490,6 @@ class CLIPModelWithAdapter(_CLIPModel):
                 )
                 # v_hidden_states = v_hidden_states + vt_hidden_states
                 # t_hidden_states = t_hidden_states + tv_hidden_states
-
-            v_hidden_states = v_residual + v_hidden_states
-            t_hidden_states = t_residual + t_hidden_states
-            v_residual = v_hidden_states
-            t_residual = t_hidden_states
 
             v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
             t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
