@@ -38,9 +38,7 @@ class FashionCLIP(BaseModel):
         weight_decay = config.optimizer.params.weight_decay
         lr_multiplier = self.config.get("lr_multiplier", 1.0)
 
-        print(self.model.state_dict().keys())
-
-        lr_filter = ["adapt_mlp", "heads"]
+        lr_filter = ["adapt_mlp", "heads", "cross_attn"]
         params = get_fashionvil_configured_parameters(
             self.model,
             base_lr,

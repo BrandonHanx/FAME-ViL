@@ -436,8 +436,9 @@ class CLIPModelWithAdapter(_CLIPModel):
         self,
         pixel_values: Optional[torch.FloatTensor] = None,
         input_ids: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        task_name: Optional[str] = None,
         # output_attentions: Optional[bool] = None,
     ) -> torch.FloatTensor:
 
@@ -452,7 +453,7 @@ class CLIPModelWithAdapter(_CLIPModel):
         )
         bsz, seq_len = input_shape
         causal_attention_mask = self.text_model._build_causal_attention_mask(
-            bsz, seq_len
+            bsz, seq_len, t_hidden_states.dtype
         ).to(t_hidden_states.device)
         if attention_mask is not None:
             self_attn_mask = _expand_mask(attention_mask, t_hidden_states.dtype)
@@ -487,8 +488,8 @@ class CLIPModelWithAdapter(_CLIPModel):
             v_residual = v_hidden_states
             t_residual = t_hidden_states
 
-            v_hidden_states = v_layer.forward_mlp(v_hidden_states)
-            t_hidden_states = t_layer.forward_mlp(t_hidden_states)
+            v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
+            t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
             v_hidden_states = v_residual + v_hidden_states
             t_hidden_states = t_residual + t_hidden_states
 

@@ -13,7 +13,7 @@ model_config:
       adapter_name: scaled_pa
       bottleneck: 64
       dropout: 0.0
-      enable_xattn: false
+      enable_xattn: true
       share_cross: false
       share_adapter: false
       cross_dropout: 0.0
@@ -43,7 +43,7 @@ evaluation:
     - r@k_fashioniq
 
 training:
-  experiment_name: fashionclip_fashioniq_composition_alltrain
+  experiment_name: fashionclip_fashioniq_composition_alltrain_xattn
   batch_size: 64
   lr_scheduler: true
   max_updates: 6000

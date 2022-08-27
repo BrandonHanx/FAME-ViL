@@ -23,6 +23,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
         self.config = config
+        self.enable_xattn = config.adapter_config.enable_xattn
 
         self.init_heads()
         self.init_losses()
@@ -100,13 +101,20 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             sample_list.tar_image, task_name="tgir"
         )
         tar_embeddings = self.heads["tgir"](tar_embeddings)
-
-        ref_embeddings = self.clip.get_image_features(
-            sample_list.ref_image, task_name="tgir"
-        )
-        text_embeddings = self.clip.get_text_features(
-            sample_list.input_ids, sample_list.attention_mask, task_name="tgir"
-        )
+        if self.enable_xattn:
+            ref_embeddings, text_embeddings = self.clip.get_cross_attn_features(
+                sample_list.ref_image,
+                sample_list.input_ids,
+                sample_list.attention_mask,
+                task_name="tgir",
+            )
+        else:
+            ref_embeddings = self.clip.get_image_features(
+                sample_list.ref_image, task_name="tgir"
+            )
+            text_embeddings = self.clip.get_text_features(
+                sample_list.input_ids, sample_list.attention_mask, task_name="tgir"
+            )
         comp_embeddings = ref_embeddings + text_embeddings  # vector addition
         comp_embeddings = self.heads["tgir"](comp_embeddings)
 
