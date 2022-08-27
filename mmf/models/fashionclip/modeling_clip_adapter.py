@@ -77,7 +77,8 @@ class CLIPCrossAttention(nn.Module):
         self.value = nn.Linear(ctx_dim, self.head_size)
 
         self.dropout = nn.Dropout(config.attention_dropout)
-        self.scale = nn.Parameter(torch.zeros(1))
+        self.xattn_adapter = Adapter(config.hidden_size, 64)
+        # self.scale = nn.Parameter(torch.zeros(1))
         self.query_layernorm = nn.LayerNorm(config.hidden_size)
         self.context_layernorm = nn.LayerNorm(ctx_dim)
 
@@ -121,7 +122,8 @@ class CLIPCrossAttention(nn.Module):
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.head_size,)
-        context_layer = context_layer.view(new_context_layer_shape) * self.scale
+        context_layer = context_layer.view(new_context_layer_shape)
+        context_layer = self.xattn_adapter(context_layer)
 
         outputs = (
             (context_layer, attention_probs)
@@ -472,7 +474,8 @@ class CLIPModelWithAdapter(_CLIPModel):
             )
 
             if random.random() < self.adapter_config.cross_dropout and self.training:
-                pass
+                vt_hidden_states = 0
+                tv_hidden_states = 0
             else:
                 vt_hidden_states, _ = v_layer.forward_cross_attn(
                     v_hidden_states, t_hidden_states, cross_attn_mask
@@ -480,8 +483,8 @@ class CLIPModelWithAdapter(_CLIPModel):
                 tv_hidden_states, _ = t_layer.forward_cross_attn(
                     t_hidden_states, v_hidden_states
                 )
-                v_hidden_states = v_hidden_states + vt_hidden_states
-                t_hidden_states = t_hidden_states + tv_hidden_states
+                # v_hidden_states = v_hidden_states + vt_hidden_states
+                # t_hidden_states = t_hidden_states + tv_hidden_states
 
             v_hidden_states = v_residual + v_hidden_states
             t_hidden_states = t_residual + t_hidden_states
@@ -490,8 +493,8 @@ class CLIPModelWithAdapter(_CLIPModel):
 
             v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
             t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
-            v_hidden_states = v_residual + v_hidden_states
-            t_hidden_states = t_residual + t_hidden_states
+            v_hidden_states = v_residual + v_hidden_states + vt_hidden_states
+            t_hidden_states = t_residual + t_hidden_states + tv_hidden_states
 
         v_features = v_hidden_states[:, 0, :]
         v_features = self.vision_model.post_layernorm(v_features)
