@@ -20,7 +20,7 @@ model_config:
       adapter_name: scaled_pa
       bottleneck: 64
       dropout: 0.0
-      enable_xattn: false
+      enable_xattn: true
       share_cross: false
       share_adapter: false
       cross_dropout: 0.0
@@ -55,13 +55,13 @@ model_config:
         adapter_name: scaled_pa
         bottleneck: 64
         dropout: 0.0
-        enable_xattn: false
+        enable_xattn: true
         share_cross: false
         share_adapter: false
         cross_dropout: 0.0
       tasks:
       - tgir
-      pretrained_path: save/fashionclip_fashioniq_composition_alltrain/fashionclip_final.pth
+      pretrained_path: save/fashionclip_fashioniq_composition_alltrain_xattn/fashionclip_final.pth
     scr_teacher_config:
       training_head_type: mtl
       clip_config:
@@ -71,14 +71,14 @@ model_config:
         adapter_name: scaled_pa
         bottleneck: 64
         dropout: 0.0
-        enable_xattn: false
+        enable_xattn: true
         share_cross: false
         share_adapter: false
         cross_dropout: 0.0
       tasks:
       - scr
       num_labels: 121
-      pretrained_path: save/fashionclip_fashiongen_scr_alltrain/fashionclip_final.pth
+      pretrained_path: save/fashionclip_fashiongen_scr_alltrain_xattn/fashionclip_final.pth
 
 scheduler:
   type: multi_step
@@ -113,7 +113,7 @@ evaluation:
     - fashiongen_cls
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_kd_ogdm
+  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_kd_xattn
   batch_size: 64
   lr_scheduler: true
   max_updates: 60000
@@ -121,10 +121,10 @@ training:
   checkpoint_interval: 1000
   evaluation_interval: 1000
   find_unused_parameters: true
-  update_frequency: 1
-  accumulate_feilds: false
-  buffer_gradients: true
-  gradient_strategy: ogd
+  # update_frequency: 1
+  # accumulate_feilds: false
+  # buffer_gradients: true
+  # gradient_strategy: ogd
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg
     minimize: false
