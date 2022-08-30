@@ -484,6 +484,6 @@ def all_gather(data):
     data_list = []
     for size, tensor in zip(size_list, tensor_list):
         buffer = tensor.cpu().numpy().tobytes()[:size]
-        data_list.append(pickle.loads(buffer))
+        data_list.append(pickle.loads(buffer).to("cuda"))
 
     return data_list
