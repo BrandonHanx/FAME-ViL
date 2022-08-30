@@ -52,6 +52,7 @@ import numpy as np
 import torch
 from mmf.common.registry import registry
 from mmf.datasets.processors.processors import EvalAIAnswerProcessor
+from mmf.utils.distributed import all_gather
 from mmf.utils.logger import log_class_usage
 from sklearn.metrics import (
     average_precision_score,
@@ -1303,6 +1304,11 @@ class RecallAtK_general(BaseMetric):
         image_ids = sample_list["image_id"].squeeze()
         text_ids = sample_list["text_id"].squeeze()
 
+        image_embeddings = torch.cat(all_gather(image_embeddings), dim=0)
+        text_embeddings = torch.cat(all_gather(text_embeddings), dim=0)
+        image_ids = torch.cat(all_gather(image_ids), dim=0)
+        text_ids = torch.cat(all_gather(text_ids), dim=0)
+
         keys = [
             f"i2t_r@1",
             f"i2t_r@5",
@@ -1404,6 +1410,8 @@ class RecallAtK_kaleido(BaseMetric):
         text_ids = sample_list["text_id"].squeeze()
         image_subcat_ids = sample_list["image_subcat_id"]
         text_subcat_ids = sample_list["text_subcat_id"]
+
+        # FIXME: doesn't support multi-gpu
 
         keys = [
             f"i2t_r@1",
@@ -1629,6 +1637,12 @@ class RecallAtK_fashioniq(BaseMetric):
         target_ids = sample_list["target_id"]
         fake_data = sample_list["fake_data"]
         garment_class = sample_list["garment_class"]
+
+        comp_embeddings = torch.cat(all_gather(comp_embeddings), dim=0)
+        tar_embeddings = torch.cat(all_gather(tar_embeddings), dim=0)
+        target_ids = torch.cat(all_gather(target_ids), dim=0)
+        fake_data = torch.cat(all_gather(fake_data), dim=0)
+        garment_class = torch.cat(all_gather(garment_class), dim=0)
 
         dress_index = garment_class == 0
         shirt_index = garment_class == 1
