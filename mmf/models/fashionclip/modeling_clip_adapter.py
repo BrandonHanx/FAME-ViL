@@ -46,6 +46,7 @@ class CLIPAdapterConfig:
         bottleneck: int = 64,
         dropout: float = 0.0,
         enable_xattn: bool = False,
+        only_textual_xattn: bool = False,
         cross_dropout: float = 0.0,
         share_cross: bool = False,
         share_adapter: bool = False,
@@ -56,6 +57,7 @@ class CLIPAdapterConfig:
         self.bottleneck = bottleneck
         self.dropout = dropout
         self.enable_xattn = enable_xattn
+        self.only_textual_xattn = only_textual_xattn
         self.cross_dropout = cross_dropout
         self.share_cross = share_cross
         self.share_adapter = share_adapter
@@ -187,9 +189,13 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
                     )
             if self.adapter_config.enable_xattn:
                 # FIXME: monkey patching
-                self.cross_attn = CLIPCrossAttention(
-                    config, 768 if config.hidden_size == 512 else 512
-                )
+                if config.hidden_size == 512:
+                    self.cross_attn = CLIPCrossAttention(config, 768)
+                elif (
+                    config.hidden_size == 768
+                    and not self.adapter_config.only_textual_xattn
+                ):
+                    self.cross_attn = CLIPCrossAttention(config, 512)
 
     def freeze(self):
         _freeze(self.self_attn)
@@ -488,8 +494,6 @@ class CLIPModelWithAdapter(_CLIPModel):
                 tv_hidden_states, _ = t_layer.forward_cross_attn(
                     t_hidden_states, v_hidden_states
                 )
-                # v_hidden_states = v_hidden_states + vt_hidden_states
-                # t_hidden_states = t_hidden_states + tv_hidden_states
 
             v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
             t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
@@ -507,3 +511,56 @@ class CLIPModelWithAdapter(_CLIPModel):
         t_features = self.text_projection(t_features)
 
         return v_features, t_features
+
+    def get_i2t_attn_features(
+        self,
+        pixel_values: Optional[torch.FloatTensor] = None,
+        input_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        task_name: Optional[str] = None,
+        # output_attentions: Optional[bool] = None,
+    ) -> torch.FloatTensor:
+
+        v_hidden_states = self.vision_model.embeddings(pixel_values)
+        v_hidden_states = self.vision_model.pre_layrnorm(v_hidden_states)
+
+        input_shape = input_ids.size()
+        input_ids = input_ids.view(-1, input_shape[-1])
+
+        t_hidden_states = self.text_model.embeddings(
+            input_ids=input_ids, position_ids=position_ids
+        )
+        bsz, seq_len = input_shape
+        causal_attention_mask = self.text_model._build_causal_attention_mask(
+            bsz, seq_len, t_hidden_states.dtype
+        ).to(t_hidden_states.device)
+        if attention_mask is not None:
+            self_attn_mask = _expand_mask(attention_mask, t_hidden_states.dtype)
+
+        for v_layer, t_layer in zip(
+            self.vision_model.encoder.layers, self.text_model.encoder.layers
+        ):
+            v_residual = v_hidden_states
+            t_residual = t_hidden_states
+            v_hidden_states, _ = v_layer.forward_self_attn(v_hidden_states)
+            t_hidden_states, _ = t_layer.forward_self_attn(
+                t_hidden_states, self_attn_mask, causal_attention_mask
+            )
+
+            v_hidden_states = v_residual + v_hidden_states
+            t_hidden_states = t_residual + t_hidden_states
+            v_residual = v_hidden_states
+            t_residual = t_hidden_states
+
+            v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
+            v_hidden_states = v_residual + v_hidden_states
+
+            tv_hidden_states, _ = t_layer.forward_cross_attn(
+                t_hidden_states, v_hidden_states
+            )
+            t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
+            t_hidden_states = t_residual + t_hidden_states + tv_hidden_states
+
+        t_features = self.text_model.final_layer_norm(t_hidden_states)
+        return t_features

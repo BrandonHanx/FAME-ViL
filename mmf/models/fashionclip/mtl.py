@@ -37,6 +37,12 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             self.heads["scr"] = nn.Linear(
                 self.clip.config.projection_dim, self.config.num_labels
             )
+        if "cap" in self.tasks:
+            print(self.clip.config)
+            self.heads["cap"] = nn.Linear(
+                self.clip.config.text_config.hidden_size,
+                self.clip.config.text_config.vocab_size,
+            )
 
     def init_losses(self):
         if "itc" in self.tasks:
@@ -45,6 +51,10 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             self.loss_funcs["tgir"] = BatchBasedClassificationLoss()
         if "scr" in self.tasks:
             self.loss_funcs["scr"] = CrossEntropyLoss()
+        if "cap" in self.tasks:
+            self.loss_funcs["cap"] = CrossEntropyLoss(
+                ignore_index=self.clip.config.text_config.pad_token_id
+            )
 
     def flatten_for_clip(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "attention_mask"]
@@ -135,12 +145,20 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
 
     def _forward_scr(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         self.freeze_with_task("scr")
-        visual_embeddings = self.clip.get_image_features(
-            sample_list.image, task_name="scr"
-        )
-        text_embeddings = self.clip.get_text_features(
-            sample_list.input_ids, sample_list.attention_mask, task_name="scr"
-        )
+        if self.enable_xattn:
+            visual_embeddings, text_embeddings = self.clip.get_cross_attn_features(
+                sample_list.image,
+                sample_list.input_ids,
+                sample_list.attention_mask,
+                task_name="scr",
+            )
+        else:
+            visual_embeddings = self.clip.get_image_features(
+                sample_list.image, task_name="scr"
+            )
+            text_embeddings = self.clip.get_text_features(
+                sample_list.input_ids, sample_list.attention_mask, task_name="scr"
+            )
         comp_embeddings = visual_embeddings + text_embeddings  # vector addition
         comp_embeddings = self.heads["scr"](comp_embeddings)
 
@@ -158,13 +176,38 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
 
         return output_dict
 
+    def _forward_cap(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self.freeze_with_task("cap")
+        text_embeddings = self.clip.get_i2t_attn_features(
+            sample_list.image,
+            sample_list.input_ids,
+            sample_list.attention_mask,
+            task_name="cap",
+        )
+        text_embeddings = self.heads["cap"](text_embeddings)
+
+        output_dict = {
+            "scores": text_embeddings[:, :-1].flatten(end_dim=-2),
+        }
+        sample_list["targets"] = sample_list.input_ids[:, 1:].flatten()
+
+        loss = {}
+        loss["cap_loss"] = (
+            self.loss_funcs["cap"](sample_list, output_dict) * self.loss_scales["cap"]
+        )
+        output_dict["losses"] = loss
+
+        return output_dict
+
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         if sample_list.dataset_name == "fashiongen":
             output_dict = self._forward_itc(sample_list)
         elif sample_list.dataset_name == "fashioniq":
             output_dict = self._forward_tgir(sample_list)
+        # elif sample_list.dataset_name == "fashiongen_cls":
+        #     output_dict = self._forward_scr(sample_list)
         elif sample_list.dataset_name == "fashiongen_cls":
-            output_dict = self._forward_scr(sample_list)
+            output_dict = self._forward_cap(sample_list)
         else:
             raise NotImplementedError
         return output_dict
