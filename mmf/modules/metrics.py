@@ -363,9 +363,13 @@ class Bleu4Metric(BaseMetric):
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
+        captions = all_gather(model_output["captions"])
+        references = all_gather(model_output["references"])
+        captions = [x for y in captions for x in y]
+        references = [x for y in references for x in y]
         results = self.bleu.compute(
-            predictions=model_output["captions"],
-            references=model_output["references"],
+            predictions=captions,
+            references=references,
         )
         return torch.tensor(results["bleu"], dtype=torch.float)
 
@@ -374,13 +378,17 @@ class Bleu4Metric(BaseMetric):
 class RougeLMetric(BaseMetric):
     def __init__(self):
         super().__init__("rougel")
-        self.bleu = evaluate.load("rouge")
+        self.rouge = evaluate.load("rouge")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
-        results = self.bleu.compute(
-            predictions=model_output["captions"],
-            references=model_output["references"],
+        captions = all_gather(model_output["captions"])
+        references = all_gather(model_output["references"])
+        captions = [x for y in captions for x in y]
+        references = [x for y in references for x in y]
+        results = self.rouge.compute(
+            predictions=captions,
+            references=references,
         )
         return torch.tensor(results["rougeL"], dtype=torch.float)
 
@@ -389,13 +397,17 @@ class RougeLMetric(BaseMetric):
 class MeteorMetric(BaseMetric):
     def __init__(self):
         super().__init__("meteor")
-        self.bleu = evaluate.load("meteor")
+        self.meteor = evaluate.load("meteor")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
-        results = self.bleu.compute(
-            predictions=model_output["captions"],
-            references=model_output["references"],
+        captions = all_gather(model_output["captions"])
+        references = all_gather(model_output["references"])
+        captions = [x for y in captions for x in y]
+        references = [x for y in references for x in y]
+        results = self.meteor.compute(
+            predictions=captions,
+            references=references,
         )
         return torch.tensor(results["meteor"], dtype=torch.float)
 
