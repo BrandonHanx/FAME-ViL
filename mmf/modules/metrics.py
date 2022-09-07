@@ -359,7 +359,8 @@ class CaptionBleu4Metric(BaseMetric):
 class Bleu4Metric(BaseMetric):
     def __init__(self):
         super().__init__("bleu4")
-        self.bleu = evaluate.load("bleu")
+        # self.bleu = evaluate.load("bleu")
+        self.bleu = evaluate.load("huggingface_metrics/bleu/bleu.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -378,7 +379,8 @@ class Bleu4Metric(BaseMetric):
 class RougeLMetric(BaseMetric):
     def __init__(self):
         super().__init__("rougel")
-        self.rouge = evaluate.load("rouge")
+        # self.rouge = evaluate.load("rouge")
+        self.rouge = evaluate.load("huggingface_metrics/rouge/rouge.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -397,7 +399,8 @@ class RougeLMetric(BaseMetric):
 class MeteorMetric(BaseMetric):
     def __init__(self):
         super().__init__("meteor")
-        self.meteor = evaluate.load("meteor")
+        # self.meteor = evaluate.load("meteor")
+        self.meteor = evaluate.load("huggingface_metrics/meteor/meteor.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
