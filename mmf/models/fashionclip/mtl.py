@@ -206,6 +206,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             output_dict["losses"] = loss
         else:
             input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
+            end_ids = 49407 * torch.ones_like(input_ids)
             seq_len = 1
             max_len = torch.max(torch.sum(sample_list.attention_mask, dim=-1))
             while seq_len < max_len:
@@ -224,6 +225,8 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
                 seq_len = seq_len + 1
             references = []
             captions = []
+            # in case the captions generation is not finished
+            input_ids = torch.cat([input_ids, end_ids], dim=-1)
             for x, y in zip(sample_list.input_ids, input_ids):
                 eos_x = torch.argmax(x)
                 eos_y = torch.argmax(y)

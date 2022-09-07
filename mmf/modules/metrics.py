@@ -372,7 +372,7 @@ class Bleu4Metric(BaseMetric):
             predictions=captions,
             references=references,
         )
-        return torch.tensor(results["bleu"], dtype=torch.float)
+        return torch.tensor(results["bleu"], dtype=torch.float).to("cuda")
 
 
 @registry.register_metric("rougel")
@@ -392,7 +392,7 @@ class RougeLMetric(BaseMetric):
             predictions=captions,
             references=references,
         )
-        return torch.tensor(results["rougeL"], dtype=torch.float)
+        return torch.tensor(results["rougeL"], dtype=torch.float).to("cuda")
 
 
 @registry.register_metric("meteor")
@@ -412,7 +412,7 @@ class MeteorMetric(BaseMetric):
             predictions=captions,
             references=references,
         )
-        return torch.tensor(results["meteor"], dtype=torch.float)
+        return torch.tensor(results["meteor"], dtype=torch.float).to("cuda")
 
 
 @registry.register_metric("vqa_accuracy")
