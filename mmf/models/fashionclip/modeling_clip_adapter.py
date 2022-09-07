@@ -442,8 +442,8 @@ class CLIPModelWithAdapter(_CLIPModel):
 
     def get_cross_attn_features(
         self,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        input_ids: Optional[torch.Tensor] = None,
+        pixel_values: torch.FloatTensor = None,
+        input_ids: torch.Tensor = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         task_name: Optional[str] = None,
@@ -453,13 +453,10 @@ class CLIPModelWithAdapter(_CLIPModel):
         v_hidden_states = self.vision_model.embeddings(pixel_values)
         v_hidden_states = self.vision_model.pre_layrnorm(v_hidden_states)
 
-        input_shape = input_ids.size()
-        input_ids = input_ids.view(-1, input_shape[-1])
-
         t_hidden_states = self.text_model.embeddings(
             input_ids=input_ids, position_ids=position_ids
         )
-        bsz, seq_len = input_shape
+        bsz, seq_len = input_ids.size()
         causal_attention_mask = self.text_model._build_causal_attention_mask(
             bsz, seq_len, t_hidden_states.dtype
         ).to(t_hidden_states.device)
@@ -512,50 +509,56 @@ class CLIPModelWithAdapter(_CLIPModel):
 
         return v_features, t_features
 
+    def get_vision_context_memory(
+        self,
+        pixel_values: torch.FloatTensor = None,
+        task_name: Optional[str] = None,
+    ) -> torch.FloatTensor:
+        v_hidden_states = self.vision_model.embeddings(pixel_values)
+        v_hidden_states = self.vision_model.pre_layrnorm(v_hidden_states)
+        vision_context_memory = []
+
+        for v_layer in self.vision_model.encoder.layers:
+            v_residual = v_hidden_states
+            v_hidden_states, _ = v_layer.forward_self_attn(v_hidden_states)
+            v_hidden_states = v_residual + v_hidden_states
+            v_residual = v_hidden_states
+            v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
+            v_hidden_states = v_residual + v_hidden_states
+            vision_context_memory.append(v_hidden_states)
+
+        return vision_context_memory
+
     def get_i2t_attn_features(
         self,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        input_ids: Optional[torch.Tensor] = None,
+        vision_context_memory: torch.FloatTensor,
+        input_ids: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         task_name: Optional[str] = None,
         # output_attentions: Optional[bool] = None,
     ) -> torch.FloatTensor:
-
-        v_hidden_states = self.vision_model.embeddings(pixel_values)
-        v_hidden_states = self.vision_model.pre_layrnorm(v_hidden_states)
-
-        input_shape = input_ids.size()
-        input_ids = input_ids.view(-1, input_shape[-1])
-
         t_hidden_states = self.text_model.embeddings(
             input_ids=input_ids, position_ids=position_ids
         )
-        bsz, seq_len = input_shape
+        bsz, seq_len = input_ids.size()
         causal_attention_mask = self.text_model._build_causal_attention_mask(
             bsz, seq_len, t_hidden_states.dtype
         ).to(t_hidden_states.device)
         if attention_mask is not None:
             self_attn_mask = _expand_mask(attention_mask, t_hidden_states.dtype)
+        else:
+            self_attn_mask = None
 
-        for v_layer, t_layer in zip(
-            self.vision_model.encoder.layers, self.text_model.encoder.layers
+        for v_hidden_states, t_layer in zip(
+            vision_context_memory, self.text_model.encoder.layers
         ):
-            v_residual = v_hidden_states
             t_residual = t_hidden_states
-            v_hidden_states, _ = v_layer.forward_self_attn(v_hidden_states)
             t_hidden_states, _ = t_layer.forward_self_attn(
                 t_hidden_states, self_attn_mask, causal_attention_mask
             )
-
-            v_hidden_states = v_residual + v_hidden_states
             t_hidden_states = t_residual + t_hidden_states
-            v_residual = v_hidden_states
             t_residual = t_hidden_states
-
-            v_hidden_states = v_layer.forward_mlp(v_hidden_states, task_name=task_name)
-            v_hidden_states = v_residual + v_hidden_states
-
             tv_hidden_states, _ = t_layer.forward_cross_attn(
                 t_hidden_states, v_hidden_states
             )

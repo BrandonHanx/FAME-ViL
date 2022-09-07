@@ -39,10 +39,11 @@ optimizer:
     eps: 1e-8
     weight_decay: 1e-5
 
-# evaluation:
-#   metrics:
-#     - accuracy
-#     - macro_f1
+evaluation:
+  metrics:
+    - bleu4
+    - rougel
+    - meteor
 
 training:
   experiment_name: fashionclip_fashiongen_cap_alltrain
@@ -53,9 +54,9 @@ training:
   checkpoint_interval: 1000
   evaluation_interval: 1000
   find_unused_parameters: true
-  # early_stop:
-  #   criteria: fashiongen_cls/accuracy
-  #   minimize: false
+  early_stop:
+    criteria: fashiongen_cls/bleu4
+    minimize: false
   wandb:
     enabled: true
 

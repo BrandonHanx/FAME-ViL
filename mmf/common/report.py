@@ -168,6 +168,8 @@ class Report(OrderedDict):
                 if self[key].dim() != report[key].dim():
                     report[key] = torch.flatten(report[key], 0, 1)
                 self[key] = torch.cat((self[key], report[key]), dim=0)
+            if isinstance(self[key], list):
+                self[key].extend(report[key])
 
         self._accumulate_loss(report)
 

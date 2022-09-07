@@ -48,6 +48,7 @@ import collections
 import warnings
 from typing import Dict
 
+import evaluate
 import numpy as np
 import torch
 from mmf.common.registry import registry
@@ -352,6 +353,51 @@ class CaptionBleu4Metric(BaseMetric):
         bleu4 = self._bleu_score.corpus_bleu(references, hypotheses)
 
         return targets.new_tensor(bleu4, dtype=torch.float)
+
+
+@registry.register_metric("bleu4")
+class Bleu4Metric(BaseMetric):
+    def __init__(self):
+        super().__init__("bleu4")
+        self.bleu = evaluate.load("bleu")
+        self.required_params = ["references", "captions"]
+
+    def calculate(self, sample_list, model_output, *args, **kwargs):
+        results = self.bleu.compute(
+            predictions=model_output["captions"],
+            references=model_output["references"],
+        )
+        return torch.tensor(results["bleu"], dtype=torch.float)
+
+
+@registry.register_metric("rougel")
+class RougeLMetric(BaseMetric):
+    def __init__(self):
+        super().__init__("rougel")
+        self.bleu = evaluate.load("rouge")
+        self.required_params = ["references", "captions"]
+
+    def calculate(self, sample_list, model_output, *args, **kwargs):
+        results = self.bleu.compute(
+            predictions=model_output["captions"],
+            references=model_output["references"],
+        )
+        return torch.tensor(results["rougeL"], dtype=torch.float)
+
+
+@registry.register_metric("meteor")
+class MeteorMetric(BaseMetric):
+    def __init__(self):
+        super().__init__("meteor")
+        self.bleu = evaluate.load("meteor")
+        self.required_params = ["references", "captions"]
+
+    def calculate(self, sample_list, model_output, *args, **kwargs):
+        results = self.bleu.compute(
+            predictions=model_output["captions"],
+            references=model_output["references"],
+        )
+        return torch.tensor(results["meteor"], dtype=torch.float)
 
 
 @registry.register_metric("vqa_accuracy")

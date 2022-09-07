@@ -2,6 +2,7 @@
 
 from typing import Dict
 
+import torch
 from mmf.models.composition import NormalizationLayer
 from mmf.modules.losses import (
     BatchBasedClassificationLoss,
@@ -9,6 +10,7 @@ from mmf.modules.losses import (
     CrossEntropyLoss,
 )
 from torch import Tensor, nn
+from transformers import CLIPTokenizer
 
 from .base import FashionCLIPBaseModel
 
@@ -38,10 +40,12 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
                 self.clip.config.projection_dim, self.config.num_labels
             )
         if "cap" in self.tasks:
-            print(self.clip.config)
             self.heads["cap"] = nn.Linear(
                 self.clip.config.text_config.hidden_size,
                 self.clip.config.text_config.vocab_size,
+            )
+            self.tokenizer = CLIPTokenizer.from_pretrained(
+                self.config.clip_config.clip_model_name
             )
 
     def init_losses(self):
@@ -52,9 +56,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         if "scr" in self.tasks:
             self.loss_funcs["scr"] = CrossEntropyLoss()
         if "cap" in self.tasks:
-            self.loss_funcs["cap"] = CrossEntropyLoss(
-                ignore_index=self.clip.config.text_config.pad_token_id
-            )
+            self.loss_funcs["cap"] = CrossEntropyLoss()
 
     def flatten_for_clip(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         to_be_flattened = ["input_ids", "attention_mask"]
@@ -178,25 +180,56 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
 
     def _forward_cap(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         self.freeze_with_task("cap")
-        text_embeddings = self.clip.get_i2t_attn_features(
-            sample_list.image,
-            sample_list.input_ids,
-            sample_list.attention_mask,
-            task_name="cap",
+        vision_context_memory = self.clip.get_vision_context_memory(
+            sample_list.image, task_name="cap"
         )
-        text_embeddings = self.heads["cap"](text_embeddings)
 
-        output_dict = {
-            "scores": text_embeddings[:, :-1].flatten(end_dim=-2),
-        }
-        sample_list["targets"] = sample_list.input_ids[:, 1:].flatten()
+        if self.training:
+            text_embeddings = self.clip.get_i2t_attn_features(
+                vision_context_memory,
+                sample_list.input_ids,
+                sample_list.attention_mask,
+                task_name="cap",
+            )
+            text_embeddings = self.heads["cap"](text_embeddings)
 
-        loss = {}
-        loss["cap_loss"] = (
-            self.loss_funcs["cap"](sample_list, output_dict) * self.loss_scales["cap"]
-        )
-        output_dict["losses"] = loss
+            output_dict = {
+                "scores": text_embeddings[:, :-1].flatten(end_dim=-2),
+            }
+            sample_list["targets"] = sample_list.input_ids[:, 1:].flatten()
 
+            loss = {}
+            loss["cap_loss"] = (
+                self.loss_funcs["cap"](sample_list, output_dict)
+                * self.loss_scales["cap"]
+            )
+            output_dict["losses"] = loss
+        else:
+            input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
+            seq_len = 1
+            max_len = torch.max(torch.sum(sample_list.attention_mask, dim=-1))
+            while seq_len < max_len:
+                next_embeddings = self.clip.get_i2t_attn_features(
+                    vision_context_memory,
+                    input_ids,
+                    task_name="cap",
+                )
+                next_logits = self.heads["cap"](next_embeddings[:, -1])
+                # Greedy
+                next_ids = torch.argmax(next_logits, dim=-1)
+                # Sampling
+                # probs = nn.functional.softmax(next_logits, dim=-1)
+                # next_ids = torch.multinomial(probs, num_samples=1).squeeze(1)
+                input_ids = torch.cat([input_ids, next_ids[:, None]], dim=-1)
+                seq_len = seq_len + 1
+            references = []
+            captions = []
+            for x, y in zip(sample_list.input_ids, input_ids):
+                eos_x = torch.argmax(x)
+                eos_y = torch.argmax(y)
+                references.append(self.tokenizer.decode(x[1:eos_x]))
+                captions.append(self.tokenizer.decode(y[1:eos_y]))
+            output_dict = {"captions": captions, "references": references}
         return output_dict
 
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
