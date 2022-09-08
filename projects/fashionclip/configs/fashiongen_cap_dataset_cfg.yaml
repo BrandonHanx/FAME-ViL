@@ -1,5 +1,5 @@
 dataset_config:
-  fashiongen_cls:
+  fashiongen_cap:
     processors:
       text_processor:
         type: clip_tokenizer

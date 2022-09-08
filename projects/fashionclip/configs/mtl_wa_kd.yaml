@@ -5,6 +5,7 @@ includes:
 - ./fashioniq_dataset_cfg.yaml
 - ./fashiongen_dataset_cfg.yaml
 - ./fashiongen_cls_dataset_cfg.yaml
+- ./fashiongen_cap_dataset_cfg.yaml
 
 model_config:
   fashionclip:
