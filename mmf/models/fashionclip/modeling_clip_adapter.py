@@ -531,7 +531,7 @@ class CLIPModelWithAdapter(_CLIPModel):
 
     def get_i2t_attn_features(
         self,
-        vision_context_memory: torch.FloatTensor,
+        vision_context_memory: List[torch.FloatTensor],
         input_ids: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,

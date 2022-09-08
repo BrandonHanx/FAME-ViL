@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 from mmf.models.composition import NormalizationLayer
@@ -11,6 +11,8 @@ from mmf.modules.losses import (
 )
 from torch import Tensor, nn
 from transformers import CLIPTokenizer
+from transformers.generation_beam_search import BeamSearchScorer
+from transformers.pytorch_utils import torch_int_div
 
 from .base import FashionCLIPBaseModel
 
@@ -178,13 +180,157 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
 
         return output_dict
 
-    def _forward_cap(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        self.freeze_with_task("cap")
+    @torch.no_grad()
+    def _greedy_generation(
+        self,
+        sample_list: Dict[str, Tensor],
+        eos_token_id: Optional[int] = 49407,
+    ) -> Dict[str, Tensor]:
         vision_context_memory = self.clip.get_vision_context_memory(
             sample_list.image, task_name="cap"
         )
+        input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
+        end_ids = eos_token_id * torch.ones_like(input_ids)
+        seq_len = 1
+        max_len = torch.max(torch.sum(sample_list.attention_mask, dim=-1))
+        while seq_len < max_len:
+            next_embeddings = self.clip.get_i2t_attn_features(
+                vision_context_memory,
+                input_ids,
+                task_name="cap",
+            )
+            next_logits = self.heads["cap"](next_embeddings[:, -1])
+            # Greedy
+            next_ids = torch.argmax(next_logits, dim=-1)
+            # Sampling
+            # probs = nn.functional.softmax(next_logits, dim=-1)
+            # next_ids = torch.multinomial(probs, num_samples=1).squeeze(1)
+            input_ids = torch.cat([input_ids, next_ids[:, None]], dim=-1)
+            seq_len = seq_len + 1
+        # in case the captions generation is not finished
+        # eos token has the largest id
+        input_ids = torch.cat([input_ids, end_ids], dim=-1)
+        return input_ids
 
+    @torch.no_grad()
+    def _beam_generation(
+        self,
+        sample_list: Dict[str, Tensor],
+        eos_token_id: Optional[int] = 49407,
+        pad_token_id: Optional[int] = 49407,
+        num_beams: Optional[int] = 5,
+    ) -> Dict[str, Tensor]:
+        batch_size = sample_list.input_ids.shape[0]
+        batch_beam_size = num_beams * batch_size
+        device = sample_list.input_ids.device
+        beam_scorer = BeamSearchScorer(
+            batch_size=batch_size,
+            num_beams=num_beams,
+            device=device,
+        )
+
+        input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
+        end_ids = eos_token_id * torch.ones_like(input_ids)
+        input_ids = input_ids.repeat(num_beams, 1)
+        vision_context_memory = self.clip.get_vision_context_memory(
+            sample_list.image, task_name="cap"
+        )
+        vision_context_memory = [
+            x.unsqueeze(1).repeat(1, num_beams, 1, 1).flatten(end_dim=1)
+            for x in vision_context_memory
+        ]
+
+        beam_scores = torch.zeros(
+            (batch_size, num_beams), dtype=torch.float, device=device
+        )
+        beam_scores[:, 1:] = -1e9
+        beam_scores = beam_scores.view((batch_beam_size,))
+        beam_indices = tuple(() for _ in range(batch_beam_size))
+
+        seq_len = 1
+        max_len = torch.max(torch.sum(sample_list.attention_mask, dim=-1))
+
+        while True:
+            next_embeddings = self.clip.get_i2t_attn_features(
+                vision_context_memory,
+                input_ids,
+                task_name="cap",
+            )
+            next_logits = self.heads["cap"](next_embeddings[:, -1])
+            next_scores = nn.functional.log_softmax(next_logits, dim=-1)
+
+            # FIXME: logits processor here
+            next_scores = next_scores + beam_scores[:, None].expand_as(next_scores)
+
+            vocab_size = next_scores.shape[-1]
+            next_scores = next_scores.view(batch_size, num_beams * vocab_size)
+
+            next_scores, next_tokens = torch.topk(
+                next_scores, 2 * num_beams, dim=1, largest=True, sorted=True
+            )
+
+            next_indices = torch_int_div(next_tokens, vocab_size)
+            next_tokens = next_tokens % vocab_size
+
+            beam_outputs = beam_scorer.process(
+                input_ids,
+                next_scores,
+                next_tokens,
+                next_indices,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
+                beam_indices=beam_indices,
+            )
+
+            beam_scores = beam_outputs["next_beam_scores"]
+            beam_next_tokens = beam_outputs["next_beam_tokens"]
+            beam_idx = beam_outputs["next_beam_indices"]
+
+            input_ids = torch.cat(
+                [input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], dim=-1
+            )
+            beam_indices = tuple(
+                beam_indices[beam_idx[i]] + (beam_idx[i],)
+                for i in range(len(beam_indices))
+            )
+            seq_len = seq_len + 1
+
+            if beam_scorer.is_done or seq_len >= max_len:
+                break
+
+        sequence_outputs = beam_scorer.finalize(
+            input_ids,
+            beam_scores,
+            next_tokens,
+            next_indices,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            max_length=max_len,
+            beam_indices=beam_indices,
+        )
+
+        # in case the captions generation is not finished
+        # eos token has the largest id
+        sequence_outputs = torch.cat([sequence_outputs["sequences"], end_ids], dim=-1)
+        return sequence_outputs
+
+    def _postprocess_generation(self, targets, predictions):
+        references = []
+        captions = []
+        for x, y in zip(targets, predictions):
+            eos_x = torch.argmax(x)
+            eos_y = torch.argmax(y)
+            references.append(self.tokenizer.decode(x[1:eos_x]))
+            captions.append(self.tokenizer.decode(y[1:eos_y]))
+        output_dict = {"captions": captions, "references": references}
+        return output_dict
+
+    def _forward_cap(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        self.freeze_with_task("cap")
         if self.training:
+            vision_context_memory = self.clip.get_vision_context_memory(
+                sample_list.image, task_name="cap"
+            )
             text_embeddings = self.clip.get_i2t_attn_features(
                 vision_context_memory,
                 sample_list.input_ids,
@@ -205,34 +351,15 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             )
             output_dict["losses"] = loss
         else:
-            input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
-            end_ids = 49407 * torch.ones_like(input_ids)
-            seq_len = 1
-            max_len = torch.max(torch.sum(sample_list.attention_mask, dim=-1))
-            while seq_len < max_len:
-                next_embeddings = self.clip.get_i2t_attn_features(
-                    vision_context_memory,
-                    input_ids,
-                    task_name="cap",
-                )
-                next_logits = self.heads["cap"](next_embeddings[:, -1])
-                # Greedy
-                next_ids = torch.argmax(next_logits, dim=-1)
-                # Sampling
-                # probs = nn.functional.softmax(next_logits, dim=-1)
-                # next_ids = torch.multinomial(probs, num_samples=1).squeeze(1)
-                input_ids = torch.cat([input_ids, next_ids[:, None]], dim=-1)
-                seq_len = seq_len + 1
-            references = []
-            captions = []
-            # in case the captions generation is not finished
-            input_ids = torch.cat([input_ids, end_ids], dim=-1)
-            for x, y in zip(sample_list.input_ids, input_ids):
-                eos_x = torch.argmax(x)
-                eos_y = torch.argmax(y)
-                references.append(self.tokenizer.decode(x[1:eos_x]))
-                captions.append(self.tokenizer.decode(y[1:eos_y]))
-            output_dict = {"captions": captions, "references": references}
+            if self.config.decoding_algorithm == "greedy":
+                predictions = self._greedy_generation(sample_list)
+            elif self.config.decoding_algorithm == "beam":
+                predictions = self._beam_generation(sample_list)
+            else:
+                raise NotImplementedError
+            output_dict = self._postprocess_generation(
+                sample_list.input_ids, predictions
+            )
         return output_dict
 
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:

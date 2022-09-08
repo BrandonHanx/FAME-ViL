@@ -21,6 +21,7 @@ model_config:
     lr_multiplier: 100
     tasks:
     - cap
+    decoding_algorithm: beam
 
 scheduler:
   type: multi_step
