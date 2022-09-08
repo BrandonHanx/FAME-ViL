@@ -367,9 +367,9 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
             output_dict = self._forward_itc(sample_list)
         elif sample_list.dataset_name == "fashioniq":
             output_dict = self._forward_tgir(sample_list)
-        # elif sample_list.dataset_name == "fashiongen_cls":
-        #     output_dict = self._forward_scr(sample_list)
         elif sample_list.dataset_name == "fashiongen_cls":
+            output_dict = self._forward_scr(sample_list)
+        elif sample_list.dataset_name == "fashiongen_cap":
             output_dict = self._forward_cap(sample_list)
         else:
             raise NotImplementedError

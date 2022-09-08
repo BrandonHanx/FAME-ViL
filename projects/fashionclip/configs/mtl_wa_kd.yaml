@@ -13,6 +13,7 @@ model_config:
     - itc
     - tgir
     - scr
+    - cap
     clip_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
@@ -28,6 +29,7 @@ model_config:
       - itc
       - tgir
       - scr
+      - cap
     lr_multiplier: 100
     num_labels: 121
     itc_teacher_config:
@@ -79,13 +81,32 @@ model_config:
       - scr
       num_labels: 121
       pretrained_path: save/fashionclip_fashiongen_scr_alltrain_xattn/fashionclip_final.pth
+    cap_teacher_config:
+      training_head_type: mtl
+      clip_config:
+        clip_model_name: openai/clip-vit-base-patch16
+      adapter_config:
+        freeze: false
+        adapter_name: scaled_pa
+        bottleneck: 64
+        dropout: 0.0
+        enable_xattn: true
+        only_textual_xattn: true
+        share_cross: false
+        share_adapter: false
+        cross_dropout: 0.0
+      tasks:
+      - cap
+      decoding_algorithm: greedy
+      pretrained_path: save/fashionclip_fashiongen_cap_alltrain/fashionclip_final.pth
 
 scheduler:
   type: multi_step
   params:
     use_warmup: false
     lr_steps:
-    - 40000
+    - 50000
+    - 80000
     lr_ratio: 0.1
     warmup_iterations: 2810
     warmup_factor: 0.25
@@ -111,12 +132,15 @@ evaluation:
   - type: macro_f1
     datasets:
     - fashiongen_cls
+  - type: bleu4
+    datasets:
+    - fashiongen_cap
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr)_wa_kd_xattn
+  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn
   batch_size: 64
   lr_scheduler: true
-  max_updates: 60000
+  max_updates: 90000
   log_interval: 10
   checkpoint_interval: 1000
   evaluation_interval: 1000

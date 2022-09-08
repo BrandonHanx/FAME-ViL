@@ -75,6 +75,18 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             logger.info(
                 f"Successfully loaded SCR teacher from {config.pretrained_path}"
             )
+        if self.config.get("cap_teacher_config", None) is not None:
+            config = self.config.cap_teacher_config
+            self.teachers["cap"] = FashionCLIPForMTL(config)
+            state_dict = torch.load(
+                config.pretrained_path,
+                map_location=torch.device("cpu"),
+            )
+            state_dict = self._rename_state_dict(state_dict)
+            self.teachers["cap"].load_state_dict(state_dict)
+            logger.info(
+                f"Successfully loaded CAP teacher from {config.pretrained_path}"
+            )
         for p in self.teachers.parameters():
             p.requires_grad = False
 
@@ -85,6 +97,8 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             self.kd_loss_funcs["tgir"] = BatchBasedClassificationLossKD()
         if "scr" in self.tasks:
             self.kd_loss_funcs["scr"] = SoftLabelCrossEntropyLoss()
+        if "cap" in self.tasks:
+            self.kd_loss_funcs["cap"] = SoftLabelCrossEntropyLoss()
 
     def _forward_itc(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
         output_dict = super()._forward_itc(sample_list)
@@ -114,6 +128,16 @@ class FashionCLIPForMTLwithKD(FashionCLIPForMTL):
             teacher_output_dict = self.teachers["scr"]._forward_scr(sample_list)
             sample_list["targets"] = F.softmax(teacher_output_dict["scores"], dim=-1)
             output_dict["losses"]["kd_scr_loss"] = self.kd_loss_funcs["scr"](
+                sample_list, output_dict
+            )
+        return output_dict
+
+    def _forward_cap(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
+        output_dict = super()._forward_cap(sample_list)
+        if self.training:
+            teacher_output_dict = self.teachers["cap"]._forward_cap(sample_list)
+            sample_list["targets"] = F.softmax(teacher_output_dict["scores"], dim=-1)
+            output_dict["losses"]["kd_cap_loss"] = self.kd_loss_funcs["cap"](
                 sample_list, output_dict
             )
         return output_dict

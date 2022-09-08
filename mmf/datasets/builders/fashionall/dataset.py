@@ -190,6 +190,26 @@ class FashionGenCLSDataset(FashionDataset):
         )
 
 
+class FashionGenCAPDataset(FashionDataset):
+    def __init__(
+        self,
+        config: MMFDatasetConfigType,
+        dataset_type: str,
+        index: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            "fashiongen_cap",
+            config,
+            dataset_type,
+            index,
+            FashionGenDatabase,
+            *args,
+            **kwargs,
+        )
+
+
 class Fashion200kDataset(FashionDataset):
     def __init__(
         self,
