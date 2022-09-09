@@ -33,6 +33,7 @@ model_config:
       - cap
     lr_multiplier: 100
     num_labels: 121
+    decoding_algorithm: greedy
     itc_teacher_config:
       training_head_type: mtl
       clip_config:
@@ -144,7 +145,7 @@ training:
   max_updates: 90000
   log_interval: 10
   checkpoint_interval: 1000
-  evaluation_interval: 1000
+  evaluation_interval: 2000
   find_unused_parameters: true
   # update_frequency: 1
   # accumulate_feilds: false
