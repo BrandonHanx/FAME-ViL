@@ -53,7 +53,7 @@ import numpy as np
 import torch
 from mmf.common.registry import registry
 from mmf.datasets.processors.processors import EvalAIAnswerProcessor
-from mmf.utils.distributed import all_gather, is_main, broadcast_tensor
+from mmf.utils.distributed import all_gather, is_main, get_world_size
 from mmf.utils.logger import log_class_usage
 from sklearn.metrics import (
     average_precision_score,
@@ -502,10 +502,11 @@ class CapGeneralMetric(BaseMetric):
             )
         else:
             bleu = rouge = meteor = cider = 0.0
-        bleu = broadcast_tensor(torch.tensor(bleu).cuda())
-        rouge = broadcast_tensor(torch.tensor(rouge).cuda())
-        meteor = broadcast_tensor(torch.tensor(meteor).cuda())
-        cider = broadcast_tensor(torch.tensor(cider).cuda())
+        world_size = get_world_size()
+        bleu = torch.tensor(bleu).cuda() * world_size
+        rouge = torch.tensor(rouge).cuda() * world_size
+        meteor = torch.tensor(meteor).cuda() * world_size
+        cider = torch.tensor(cider).cuda() * world_size
         return {"bleu": bleu, "rouge": rouge, "meteor": meteor, "cider": cider}
 
 
