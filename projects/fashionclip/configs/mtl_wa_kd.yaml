@@ -134,7 +134,7 @@ evaluation:
   - type: macro_f1
     datasets:
     - fashiongen_cls
-  - type: bleu4
+  - type: cap_general
     datasets:
     - fashiongen_cap
 

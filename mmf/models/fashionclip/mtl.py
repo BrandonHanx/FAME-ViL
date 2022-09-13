@@ -320,7 +320,7 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         for x, y in zip(targets, predictions):
             eos_x = torch.argmax(x)
             eos_y = torch.argmax(y)
-            references.append(self.tokenizer.decode(x[1:eos_x]))
+            references.append([self.tokenizer.decode(x[1:eos_x])])
             captions.append(self.tokenizer.decode(y[1:eos_y]))
         output_dict = {"captions": captions, "references": references}
         return output_dict

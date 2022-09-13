@@ -53,7 +53,7 @@ import numpy as np
 import torch
 from mmf.common.registry import registry
 from mmf.datasets.processors.processors import EvalAIAnswerProcessor
-from mmf.utils.distributed import all_gather
+from mmf.utils.distributed import all_gather, is_main, broadcast_tensor
 from mmf.utils.logger import log_class_usage
 from sklearn.metrics import (
     average_precision_score,
@@ -413,6 +413,102 @@ class MeteorMetric(BaseMetric):
             references=references,
         )
         return torch.tensor(results["meteor"], dtype=torch.float).to("cuda")
+
+
+@registry.register_metric("cider")
+class CiderMetric(BaseMetric):
+    def __init__(self):
+        super().__init__("cider")
+        # self.meteor = evaluate.load("meteor")
+        self.cider = evaluate.load("huggingface_metrics/cider/cider.py")
+        self.required_params = ["references", "captions"]
+
+    def calculate(self, sample_list, model_output, *args, **kwargs):
+        captions = all_gather(model_output["captions"])
+        references = all_gather(model_output["references"])
+        captions = [x for y in captions for x in y]
+        references = [x for y in references for x in y]
+        results = self.cider.compute(
+            predictions=captions,
+            references=references,
+        )
+        return torch.tensor(results, dtype=torch.float).to("cuda")
+
+
+@registry.register_metric("cap_general")
+class CapGeneralMetric(BaseMetric):
+    def __init__(self):
+        super().__init__("cap_general")
+        from nltk.parse.corenlp import CoreNLPParser
+
+        self.tokenizer = CoreNLPParser()
+        self.bleu = evaluate.load("huggingface_metrics/bleu/bleu.py")
+        self.rouge = evaluate.load("huggingface_metrics/rouge/rouge.py")
+        self.meteor = evaluate.load("huggingface_metrics/meteor/meteor.py")
+        self.cider = evaluate.load("huggingface_metrics/cider/cider.py")
+        self.PUNCTUATIONS = [
+            "''",
+            "'",
+            "``",
+            "`",
+            "-LRB-",
+            "-RRB-",
+            "-LCB-",
+            "-RCB-",
+            ".",
+            "?",
+            "!",
+            ",",
+            ":",
+            "-",
+            "--",
+            "...",
+            ";",
+        ]
+        self.required_params = ["references", "captions"]
+
+    def _tokenize(self, x):
+        return " ".join(
+            [x for x in list(self.tokenizer.tokenize(x)) if x not in self.PUNCTUATIONS]
+        )
+
+    def calculate(self, sample_list, model_output, *args, **kwargs):
+        captions = all_gather(model_output["captions"])
+        references = all_gather(model_output["references"])
+        captions = [x for y in captions for x in y]
+        references = [x for y in references for x in y]
+        if is_main():
+            references = [[self._tokenize(r) for r in ref] for ref in references]
+            captions = [self._tokenize(p) for p in captions]
+            bleu = self.bleu.compute(
+                predictions=captions,
+                references=references,
+                tokenizer=lambda x: x.split(),
+            )["bleu"]
+            rouge = self.rouge.compute(
+                predictions=captions,
+                references=references,
+                tokenizer=lambda x: x.split(),
+            )["rougeL"]
+            meteor = self.meteor.compute(
+                predictions=captions,
+                references=references,
+                tokenizer=lambda x: x.split(),
+            )["meteor"]
+            cider = self.cider.compute(
+                predictions=captions,
+                references=references,
+                tokenizer=lambda x: x.split(),
+            )
+        else:
+            bleu = rouge = meteor = cider = torch.tensor([0], dtype=torch.float).to(
+                "cuda"
+            )
+        bleu = broadcast_tensor(bleu)
+        rouge = broadcast_tensor(rouge)
+        meteor = broadcast_tensor(meteor)
+        cider = broadcast_tensor(cider)
+        return {"bleu": bleu, "rouge": rouge, "meteor": meteor, "cider": cider}
 
 
 @registry.register_metric("vqa_accuracy")

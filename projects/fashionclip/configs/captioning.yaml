@@ -21,7 +21,7 @@ model_config:
     lr_multiplier: 100
     tasks:
     - cap
-    decoding_algorithm: beam
+    decoding_algorithm: greedy
 
 scheduler:
   type: multi_step
@@ -42,9 +42,7 @@ optimizer:
 
 evaluation:
   metrics:
-    - bleu4
-    - rougel
-    - meteor
+    - cap_general
 
 training:
   experiment_name: fashionclip_fashiongen_cap_alltrain
