@@ -501,9 +501,10 @@ class CapGeneralMetric(BaseMetric):
                 tokenizer=lambda x: x.split(),
             )
         else:
-            bleu = rouge = meteor = cider = torch.tensor([0], dtype=torch.float).to(
-                "cuda"
-            )
+            bleu = torch.tensor(0).to("cuda")
+            rouge = torch.tensor(0).to("cuda")
+            meteor = torch.tensor(0).to("cuda")
+            cider = torch.tensor(0).to("cuda")
         bleu = broadcast_tensor(bleu)
         rouge = broadcast_tensor(rouge)
         meteor = broadcast_tensor(meteor)
