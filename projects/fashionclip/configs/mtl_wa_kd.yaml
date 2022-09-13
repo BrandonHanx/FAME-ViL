@@ -110,7 +110,7 @@ scheduler:
     - 50000
     - 80000
     lr_ratio: 0.1
-    warmup_iterations: 2810
+    warmup_iterations: 10000
     warmup_factor: 0.25
 
 optimizer:
@@ -134,12 +134,12 @@ evaluation:
   - type: macro_f1
     datasets:
     - fashiongen_cls
-  - type: cap_general
+  - type: bleu4
     datasets:
     - fashiongen_cap
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn
+  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_warmup
   batch_size: 64
   lr_scheduler: true
   max_updates: 90000
