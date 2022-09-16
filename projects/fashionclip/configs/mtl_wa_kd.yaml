@@ -34,6 +34,7 @@ model_config:
     lr_multiplier: 100
     num_labels: 121
     decoding_algorithm: greedy
+    learnable_balances: true
     itc_teacher_config:
       training_head_type: mtl
       clip_config:
@@ -105,7 +106,7 @@ model_config:
 scheduler:
   type: multi_step
   params:
-    use_warmup: false
+    use_warmup: true
     lr_steps:
     - 50000
     - 80000
@@ -139,7 +140,7 @@ evaluation:
     - fashiongen_cap
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_warmup
+  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_warmup_lb
   batch_size: 64
   lr_scheduler: true
   max_updates: 90000
