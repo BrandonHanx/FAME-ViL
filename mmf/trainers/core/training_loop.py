@@ -25,6 +25,7 @@ class TrainerTrainingLoopMixin(ABC):
     current_iteration: int = 0
     num_updates: int = 0
     meter: Meter = Meter()
+    gradient_scales: Dict = dict()
     gradients: Dict = dict()
 
     def training_loop(self) -> None:
@@ -152,6 +153,14 @@ class TrainerTrainingLoopMixin(ABC):
                     # Validation and Early stopping
                     # Create a new meter for this case
                     report, meter = self.evaluation_loop("val")
+                    if self.training_config.gradient_strategy == "implicit":
+                        self.gradient_scales = gradient_strategy.get_gradient_scales(
+                            meter.meters
+                        )
+                        if self.logistics_callback.wandb_logger is not None:
+                            self.logistics_callback.wandb_logger.log_metrics(
+                                self.gradient_scales
+                            )
 
                     # Validation end callbacks
                     stop = self.early_stop_callback.on_validation_end(
@@ -185,12 +194,12 @@ class TrainerTrainingLoopMixin(ABC):
             self._check_nan_losses(report)
         loss = extract_loss(report, loss_divisor)
         self._backward(loss)
+        self.gradients["operate_task"] = batch.dataset_name
         if buffer_gradients:
             grads = {}
             for n, p in self.model.named_parameters():
                 grads[n] = p.grad.clone() if p.grad is not None else None
             self.gradients[batch.dataset_name] = grads
-            self.gradients["operate_task"] = batch.dataset_name
             self.optimizer.zero_grad()
         return report
 
@@ -241,11 +250,15 @@ class TrainerTrainingLoopMixin(ABC):
             for n, p in self.model.named_parameters():
                 # FIXME: only OGD is available now
                 if self.training_config.gradient_strategy == "sum":
-                    p.grad = gradient_strategy.sum(p.grad, n, self.gradients)
+                    p.grad = gradient_strategy.simple_sum(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "imtlg":
                     p.grad = gradient_strategy.imtlg(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "ogd":
                     p.grad = gradient_strategy.ogd(p.grad, n, self.gradients)
+                elif self.training_config.gradient_strategy == "implicit":
+                    p.grad = gradient_strategy.implicit(
+                        p.grad, self.gradients["operate_task"], self.gradient_scales
+                    )
                 else:
                     raise NotImplementedError
             # self.gradients = []

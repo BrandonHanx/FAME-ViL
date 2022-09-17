@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 
-def sum(p_grad, name, gradient_list):
+def simple_sum(p_grad, name, gradient_list):
     for grad in gradient_list:
         p_grad = (
             p_grad + grad.get(name, 0)
@@ -67,4 +67,41 @@ def ogd(p_grad, name, gradient_dict):
         gradient_dict[operate_task][name] = (
             gradient_dict[operate_task][name] * 0.9 + p_grad.clone() * 0.1
         )
+    return p_grad
+
+
+def get_gradient_scales(val_scores, gamma=0.1, alpha=1, beta=1):
+    baseline_scores = dict(itc=0.6999, tgir=0.5547, scr=0.8621, cap=0.3691)
+    current_scores = dict(
+        itc=val_scores["val/fashiongen/r@k_general/avg"],
+        tgir=val_scores["val/fashioniq/r@k_fashioniq/avg"],
+        scr=val_scores["val/fashiongen_cls/macro_f1"],
+        cap=val_scores["val/fashiongen_cap/bleu4"],
+    )
+    relative_scores = dict()
+    for k in baseline_scores.keys():
+        relative_scores[k] = current_scores[k].get_latest() / baseline_scores[k]
+    average_relative_score = sum(relative_scores.values()) / len(relative_scores)
+    max_relative_score = max(relative_scores.values())
+    gradient_scales = dict()
+    for k in relative_scores.keys():
+        bias_score = average_relative_score - relative_scores[k]
+        sign = 1 if bias_score > 0 else -1
+        gradient_scales[k] = 1 + sign * min(
+            gamma, (max_relative_score ** alpha) * (abs(bias_score) ** beta)
+        )
+    return gradient_scales
+
+
+def implicit(p_grad, operate_task, gradient_scales):
+    if gradient_scales is None or p_grad is None:
+        return p_grad
+    if operate_task == "fashiongen":
+        p_grad = p_grad * gradient_scales["itc"]
+    elif operate_task == "fashioniq":
+        p_grad = p_grad * gradient_scales["tgir"]
+    elif operate_task == "fashiongen_cls":
+        p_grad = p_grad * gradient_scales["scr"]
+    elif operate_task == "fashiongen_cap":
+        p_grad = p_grad * gradient_scales["cap"]
     return p_grad
