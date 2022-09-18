@@ -70,7 +70,7 @@ def ogd(p_grad, name, gradient_dict):
     return p_grad
 
 
-def get_gradient_scales(val_scores, gamma=0.1, alpha=1, beta=1):
+def get_gradient_scales(val_scores, gamma=0.5, alpha=32, beta=0.7):
     baseline_scores = dict(itc=0.6999, tgir=0.5547, scr=0.8621, cap=0.3691)
     current_scores = dict(
         itc=val_scores["val/fashiongen/r@k_general/avg"],
@@ -97,11 +97,11 @@ def implicit(p_grad, operate_task, gradient_scales):
     if gradient_scales is None or p_grad is None:
         return p_grad
     if operate_task == "fashiongen":
-        p_grad = p_grad * gradient_scales["itc"]
+        p_grad = p_grad.clone() * gradient_scales["itc"]
     elif operate_task == "fashioniq":
-        p_grad = p_grad * gradient_scales["tgir"]
+        p_grad = p_grad.clone() * gradient_scales["tgir"]
     elif operate_task == "fashiongen_cls":
-        p_grad = p_grad * gradient_scales["scr"]
+        p_grad = p_grad.clone() * gradient_scales["scr"]
     elif operate_task == "fashiongen_cap":
-        p_grad = p_grad * gradient_scales["cap"]
+        p_grad = p_grad.clone() * gradient_scales["cap"]
     return p_grad
