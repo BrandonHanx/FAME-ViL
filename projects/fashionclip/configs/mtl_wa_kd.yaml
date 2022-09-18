@@ -34,7 +34,7 @@ model_config:
     lr_multiplier: 100
     num_labels: 121
     decoding_algorithm: greedy
-    learnable_balances: true
+    learnable_balances: false
     itc_teacher_config:
       training_head_type: mtl
       clip_config:
