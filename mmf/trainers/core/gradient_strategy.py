@@ -94,7 +94,7 @@ def get_gradient_scales(val_scores, gamma=0.5, alpha=32, beta=0.7):
 
 
 def implicit(p_grad, operate_task, gradient_scales):
-    if gradient_scales is None or p_grad is None:
+    if len(gradient_scales) == 0 or p_grad is None:
         return p_grad
     if operate_task == "fashiongen":
         p_grad = p_grad.clone() * gradient_scales["itc"]
