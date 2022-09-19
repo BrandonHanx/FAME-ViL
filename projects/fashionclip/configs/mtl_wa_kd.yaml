@@ -150,7 +150,7 @@ training:
   find_unused_parameters: true
   # update_frequency: 1
   # accumulate_feilds: false
-  buffer_gradients: true
+  # buffer_gradients: true
   gradient_strategy: implicit
   early_stop:
     criteria: fashioniq/r@k_fashioniq/avg

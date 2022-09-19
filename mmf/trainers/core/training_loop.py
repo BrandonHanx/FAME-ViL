@@ -255,13 +255,13 @@ class TrainerTrainingLoopMixin(ABC):
                     p.grad = gradient_strategy.imtlg(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "ogd":
                     p.grad = gradient_strategy.ogd(p.grad, n, self.gradients)
-                elif self.training_config.gradient_strategy == "implicit":
-                    p.grad = gradient_strategy.implicit(
-                        p.grad, self.gradients["operate_task"], self.gradient_scales
-                    )
                 else:
                     raise NotImplementedError
-            # self.gradients = []
+        elif self.training_config.gradient_strategy == "implicit":
+            for p in self.model.parameters():
+                p.grad = gradient_strategy.implicit(
+                    p.grad, self.gradients["operate_task"], self.gradient_scales
+                )
         if self.training_config.clip_gradients:
             clip_gradients(
                 self.model,
