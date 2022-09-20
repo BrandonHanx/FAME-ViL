@@ -260,7 +260,7 @@ class TrainerTrainingLoopMixin(ABC):
         elif self.training_config.gradient_strategy == "implicit":
             for n, p in self.model.named_parameters():
                 filters = ["adapt_mlp", "heads", "cross_attn"]
-                if any(x in n for x in filters):
+                if not any(x in n for x in filters):
                     p.grad = gradient_strategy.implicit(
                         p.grad, self.gradients["operate_task"], self.gradient_scales
                     )
