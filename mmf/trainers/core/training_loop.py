@@ -258,10 +258,12 @@ class TrainerTrainingLoopMixin(ABC):
                 else:
                     raise NotImplementedError
         elif self.training_config.gradient_strategy == "implicit":
-            for p in self.model.parameters():
-                p.grad = gradient_strategy.implicit(
-                    p.grad, self.gradients["operate_task"], self.gradient_scales
-                )
+            for n, p in self.model.named_parameters():
+                filters = ["adapt_mlp", "heads", "cross_attn"]
+                if any(x in n for x in filters):
+                    p.grad = gradient_strategy.implicit(
+                        p.grad, self.gradients["operate_task"], self.gradient_scales
+                    )
         if self.training_config.clip_gradients:
             clip_gradients(
                 self.model,
