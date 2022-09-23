@@ -153,14 +153,57 @@ class TrainerTrainingLoopMixin(ABC):
                     # Validation and Early stopping
                     # Create a new meter for this case
                     report, meter = self.evaluation_loop("val")
-                    if self.training_config.gradient_strategy == "implicit":
+                    if self.training_config.gradient_strategy in [
+                        "implicit",
+                        "explicit",
+                    ]:
                         self.gradient_scales = gradient_strategy.get_gradient_scales(
                             meter.meters
                         )
                         if self.logistics_callback.wandb_logger is not None:
                             self.logistics_callback.wandb_logger.log_metrics(
-                                self.gradient_scales
+                                {
+                                    "gradient_scales/" + k: v
+                                    for k, v in self.gradient_scales.items()
+                                }
                             )
+                        if self.training_config.gradient_strategy == "explicit":
+                            dataset_probabilities = []
+                            map_dict = dict(
+                                fashiongen="itc",
+                                fashioniq="tgir",
+                                fashiongen_cls="scr",
+                                fashiongen_cap="cap",
+                            )
+                            for i, k in enumerate(
+                                self.train_loader._iteration_strategy.dataloaders.keys()
+                            ):
+                                dataset_probabilities.append(
+                                    self.train_loader._iteration_strategy._dataset_probabilities[
+                                        i
+                                    ]
+                                    * self.gradient_scales[map_dict[k]]
+                                )
+                            dataset_probabilities = [
+                                x / sum(dataset_probabilities)
+                                for x in dataset_probabilities
+                            ]
+                            self.train_loader._iteration_strategy._dataset_probabilities = (
+                                dataset_probabilities
+                            )
+                            if self.logistics_callback.wandb_logger is not None:
+                                dataset_probabilities = dict(
+                                    zip(
+                                        self.train_loader._iteration_strategy.dataloaders.keys(),
+                                        dataset_probabilities,
+                                    )
+                                )
+                                self.logistics_callback.wandb_logger.log_metrics(
+                                    {
+                                        "dataset_probabilities/" + k: v
+                                        for k, v in dataset_probabilities.items()
+                                    }
+                                )
 
                     # Validation end callbacks
                     stop = self.early_stop_callback.on_validation_end(
