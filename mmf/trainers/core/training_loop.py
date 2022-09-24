@@ -56,6 +56,10 @@ class TrainerTrainingLoopMixin(ABC):
 
     def run_training_epoch(self) -> None:
         should_break = False
+        if self.training_config.gradient_strategy == "explicit":
+            init_probabilities = (
+                self.train_loader._iteration_strategy._dataset_probabilities
+            )
         while self.num_updates < self.max_updates and not should_break:
             self.current_epoch += 1
             registry.register("current_epoch", self.current_epoch)
@@ -179,10 +183,8 @@ class TrainerTrainingLoopMixin(ABC):
                                 self.train_loader._iteration_strategy.dataloaders.keys()
                             ):
                                 dataset_probabilities.append(
-                                    self.train_loader._iteration_strategy._dataset_probabilities[
-                                        i
-                                    ]
-                                    * self.gradient_scales[map_dict[k]]
+                                    init_probabilities[i]
+                                    * self.gradient_scales[map_dict[k]].cpu().numpy()
                                 )
                             dataset_probabilities = [
                                 x / sum(dataset_probabilities)
