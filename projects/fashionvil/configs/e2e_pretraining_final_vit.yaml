@@ -1,0 +1,28 @@
+includes:
+- ./e2e_pretraining_final.yaml
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: vit_image_encoder
+      params:
+        name: vit
+        pretrained_model_name: google/vit-base-patch32-224-in21k
+        random_init: false
+        gradient_checkpointing: false
+    visual_embedding_dim: 768
+
+training:
+  experiment_name: fashionvil_e2e_pretrain_final_vit
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 120000
+  log_interval: 10
+  checkpoint_interval: 15000
+  evaluation_interval: 1500
+  find_unused_parameters: true
+  early_stop:
+    criteria: fashionall/r@k_general/avg
+    minimize: false
+  wandb:
+    enabled: true

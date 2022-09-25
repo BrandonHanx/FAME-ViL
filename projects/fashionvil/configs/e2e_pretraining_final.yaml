@@ -28,7 +28,7 @@ dataset_config:
 
 model_config:
   fashionvil:
-    no_sharing: true
+    no_sharing: false
     image_encoder:
       type: torchvision_resnet
       params:
@@ -96,7 +96,7 @@ evaluation:
   - type: r@k_general
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_final_ns
+  experiment_name: fashionvil_e2e_pretrain_final
   batch_size: 256
   lr_scheduler: true
   max_updates: 120000

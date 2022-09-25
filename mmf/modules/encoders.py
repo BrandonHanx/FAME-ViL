@@ -234,6 +234,8 @@ class ImageEncoderFactory(EncoderFactory):
             self.module = VQVAEEncoder(params)
         elif self._type == "clip_image_encoder":
             self.module = CLIPImageEncoder(params)
+        elif self._type == "vit_image_encoder":
+            self.module = ViTEncoder(params)
         else:
             raise NotImplementedError("Unknown Image Encoder: %s" % self._type)
 
@@ -973,4 +975,4 @@ class ViTEncoder(Encoder):
         if "output_hidden_states" not in kwargs:
             kwargs["output_hidden_states"] = False
         output = self.module(*args, **kwargs)
-        return output["last_hidden_state"], output.get("hidden_states", None)
+        return output["last_hidden_state"][:, 1:]

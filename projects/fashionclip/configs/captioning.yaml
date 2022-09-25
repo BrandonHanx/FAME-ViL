@@ -54,7 +54,7 @@ training:
   evaluation_interval: 1000
   find_unused_parameters: true
   early_stop:
-    criteria: fashiongen_cls/bleu4
+    criteria: fashiongen_cap/bleu4
     minimize: false
   wandb:
     enabled: true
