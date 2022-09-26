@@ -14,7 +14,7 @@ model_config:
 
 training:
   experiment_name: fashionvil_e2e_pretrain_final_vit
-  batch_size: 64
+  batch_size: 256
   lr_scheduler: true
   max_updates: 120000
   log_interval: 10

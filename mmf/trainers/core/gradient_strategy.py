@@ -70,8 +70,8 @@ def ogd(p_grad, name, gradient_dict):
     return p_grad
 
 
-def get_gradient_scales(val_scores, gamma=0.5, alpha=32, beta=0.7):
-    baseline_scores = dict(itc=0.6999, tgir=0.5547, scr=0.8621, cap=0.3691)
+def get_gradient_scales(val_scores, gamma=0.5, alpha=64, beta=1):
+    baseline_scores = dict(itc=0.7, tgir=0.6, scr=0.9, cap=0.4)
     current_scores = dict(
         itc=val_scores["val/fashiongen/r@k_general/avg"],
         tgir=val_scores["val/fashioniq/r@k_fashioniq/avg"],
