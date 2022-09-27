@@ -7,13 +7,25 @@ model_config:
       type: vit_image_encoder
       params:
         name: vit
-        pretrained_model_name: google/vit-base-patch32-224-in21k
+        pretrained_model_name: google/vit-base-patch16-224-in21k
         random_init: false
         gradient_checkpointing: false
     visual_embedding_dim: 768
+    tasks:
+      - itm
+      - pac
+      - itc
+      - icc
+      - mlm
+    tasks_sample_ratio:
+      - 0.2
+      - 0.2
+      - 0.2
+      - 0.2
+      - 0.2
 
 training:
-  experiment_name: fashionvil_e2e_pretrain_final_vit
+  experiment_name: fashionvil_e2e_pretrain_final_vit16
   batch_size: 256
   lr_scheduler: true
   max_updates: 120000
