@@ -53,7 +53,7 @@ evaluation:
     - macro_f1
 
 training:
-  experiment_name: fashionvil_classification_fashiongen_e2e_sub
+  experiment_name: fashionvil_classification_fashiongen_e2e_sub_final
   batch_size: 32
   lr_scheduler: true
   max_updates: 28840
@@ -70,7 +70,7 @@ run_type: train_val
 
 checkpoint:
   resume_pretrained: true
-  resume_file: save/fashionvil_e2e_pretrain_baseline/best.ckpt
+  resume_file: save/fashionvil_e2e_pretrain_final/best.ckpt
   pretrained_state_mapping:
     image_encoder: image_encoder
     model.bert: model.bert
