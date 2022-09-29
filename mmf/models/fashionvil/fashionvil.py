@@ -9,6 +9,7 @@ from mmf.models.fashionvil.classification import FashionViLForClassification
 from mmf.models.fashionvil.composition import FashionViLForComposition
 from mmf.models.fashionvil.contrastive import FashionViLForContrastive
 from mmf.models.fashionvil.pretraining import FashionViLForPretraining
+from mmf.modules.encoders import ViTEncoder
 from mmf.utils.build import build_image_encoder
 from mmf.utils.distributed import broadcast_tensor
 from mmf.utils.general import filter_grads
@@ -72,15 +73,18 @@ class FashionViL(BaseModel):
         base_lr = config.optimizer.params.lr
         weight_decay = config.optimizer.params.weight_decay
         lr_multiplier = self.config.lr_multiplier
+        is_vit = isinstance(self.image_encoder, ViTEncoder)
 
         image_encoder_params = [
             {
                 "params": filter_grads(self.image_encoder.parameters()),
-                "lr": base_lr * lr_multiplier,
+                "lr": base_lr if is_vit else base_lr * lr_multiplier,
             }
         ]
         lr_filter = []
-        lr_filter.append("bert.embeddings")
+        lr_filter.append("bert.embeddings.token_type_embeddings_visual")
+        lr_filter.append("bert.embeddings.position_embeddings_visual")
+        lr_filter.append("bert.embeddings.projection")
         if self.training_head_type == "classification":
             lr_filter.append("classifier")
         elif self.training_head_type == "pretraining":
