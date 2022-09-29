@@ -360,7 +360,7 @@ class Bleu4Metric(BaseMetric):
     def __init__(self):
         super().__init__("bleu4")
         # self.bleu = evaluate.load("bleu")
-        self.bleu = evaluate.load("huggingface_metrics/bleu/bleu.py")
+        self.bleu = evaluate.load("mmf/modules/cococap_metrics/bleu/bleu.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -380,7 +380,7 @@ class RougeLMetric(BaseMetric):
     def __init__(self):
         super().__init__("rougel")
         # self.rouge = evaluate.load("rouge")
-        self.rouge = evaluate.load("huggingface_metrics/rouge/rouge.py")
+        self.rouge = evaluate.load("mmf/modules/cococap_metrics/rouge/rouge.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -399,8 +399,7 @@ class RougeLMetric(BaseMetric):
 class MeteorMetric(BaseMetric):
     def __init__(self):
         super().__init__("meteor")
-        # self.meteor = evaluate.load("meteor")
-        self.meteor = evaluate.load("huggingface_metrics/meteor/meteor.py")
+        self.meteor = evaluate.load("meteor")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -419,8 +418,7 @@ class MeteorMetric(BaseMetric):
 class CiderMetric(BaseMetric):
     def __init__(self):
         super().__init__("cider")
-        # self.meteor = evaluate.load("meteor")
-        self.cider = evaluate.load("huggingface_metrics/cider/cider.py")
+        self.cider = evaluate.load("mmf/modules/cococap_metrics/cider/cider.py")
         self.required_params = ["references", "captions"]
 
     def calculate(self, sample_list, model_output, *args, **kwargs):
@@ -439,13 +437,14 @@ class CiderMetric(BaseMetric):
 class CapGeneralMetric(BaseMetric):
     def __init__(self):
         super().__init__("cap_general")
+        from mmf.modules.cococap_metrics.meteor.meteor import Meteor
         from nltk.parse.corenlp import CoreNLPParser
 
         self.tokenizer = CoreNLPParser()
-        self.bleu = evaluate.load("huggingface_metrics/bleu/bleu.py")
-        self.rouge = evaluate.load("huggingface_metrics/rouge/rouge.py")
-        self.meteor = evaluate.load("huggingface_metrics/meteor/meteor.py")
-        self.cider = evaluate.load("huggingface_metrics/cider/cider.py")
+        self.bleu = evaluate.load("mmf/modules/cococap_metrics/bleu/bleu.py")
+        self.rouge = evaluate.load("mmf/modules/cococap_metrics/rouge/rouge.py")
+        self.meteor = Meteor()
+        self.cider = evaluate.load("mmf/modules/cococap_metrics/cider/cider.py")
         self.PUNCTUATIONS = [
             "''",
             "'",
@@ -493,8 +492,7 @@ class CapGeneralMetric(BaseMetric):
             meteor = self.meteor.compute(
                 predictions=captions,
                 references=references,
-                tokenizer=lambda x: x.split(),
-            )["meteor"]
+            )
             cider = self.cider.compute(
                 predictions=captions,
                 references=references,

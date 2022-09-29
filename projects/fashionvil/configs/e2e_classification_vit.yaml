@@ -13,6 +13,7 @@ model_config:
         random_init: false
         gradient_checkpointing: false
     visual_embedding_dim: 768
+    lr_multiplier: 1
 
 training:
   experiment_name: fashionvil_classification_fashiongen_e2e_sub_vit
