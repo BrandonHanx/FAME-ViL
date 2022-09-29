@@ -9,7 +9,7 @@ import threading
 
 # Assumes meteor-1.5.jar is in the same directory as meteor.py.  Change as needed.
 METEOR_JAR = "meteor-1.5.jar"
-PARAPHRASE = "data/paraphrase-en.gz"
+PARAPHRASE = "paraphrase-en.gz"
 
 
 class Meteor:
