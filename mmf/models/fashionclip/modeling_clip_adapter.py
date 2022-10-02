@@ -559,9 +559,12 @@ class CLIPModelWithAdapter(_CLIPModel):
             )
             t_hidden_states = t_residual + t_hidden_states
             t_residual = t_hidden_states
-            tv_hidden_states, _ = t_layer.forward_cross_attn(
-                t_hidden_states, v_hidden_states
-            )
+            if random.random() < self.adapter_config.cross_dropout and self.training:
+                tv_hidden_states = 0
+            else:
+                tv_hidden_states, _ = t_layer.forward_cross_attn(
+                    t_hidden_states, v_hidden_states
+                )
             t_hidden_states = t_layer.forward_mlp(t_hidden_states, task_name=task_name)
             t_hidden_states = t_residual + t_hidden_states + tv_hidden_states
 
