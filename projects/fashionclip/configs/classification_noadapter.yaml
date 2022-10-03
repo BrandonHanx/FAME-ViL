@@ -1,7 +1,7 @@
 # FashionGen data nums: 60147
 
 includes:
-- ./fashiongen_cap_dataset_cfg.yaml
+- ./fashiongen_cls_dataset_cfg.yaml
 
 model_config:
   fashionclip:
@@ -10,18 +10,14 @@ model_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
       freeze: false
-      adapter_name: scaled_pa
-      bottleneck: 64
-      dropout: 0.0
       enable_xattn: true
-      only_textual_xattn: true
       share_cross: false
       share_adapter: false
       cross_dropout: 0.0
     lr_multiplier: 100
     tasks:
-    - cap
-    decoding_algorithm: greedy
+    - scr
+    num_labels: 121
 
 scheduler:
   type: multi_step
@@ -42,10 +38,11 @@ optimizer:
 
 evaluation:
   metrics:
-    - bleu4
+    - accuracy
+    - macro_f1
 
 training:
-  experiment_name: fashionclip_fashiongen_cap_alltrain
+  experiment_name: fashionclip_fashiongen_scr_xattn_noadapter
   batch_size: 64
   lr_scheduler: true
   max_updates: 30000
@@ -54,7 +51,7 @@ training:
   evaluation_interval: 1000
   find_unused_parameters: true
   early_stop:
-    criteria: fashiongen_cap/bleu4
+    criteria: fashiongen_cls/accuracy
     minimize: false
   wandb:
     enabled: true

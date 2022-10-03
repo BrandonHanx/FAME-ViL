@@ -10,9 +10,6 @@ model_config:
       clip_model_name: openai/clip-vit-base-patch16
     adapter_config:
       freeze: false
-      adapter_name: scaled_pa
-      bottleneck: 64
-      dropout: 0.0
       enable_xattn: true
       only_textual_xattn: true
       share_cross: false
@@ -45,7 +42,7 @@ evaluation:
     - bleu4
 
 training:
-  experiment_name: fashionclip_fashiongen_cap_alltrain
+  experiment_name: fashionclip_fashiongen_cap_noadapter
   batch_size: 64
   lr_scheduler: true
   max_updates: 30000
