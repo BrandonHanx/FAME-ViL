@@ -148,7 +148,9 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
         if self.adapter_config is not None:
             if self.adapter_config.freeze:
                 self.freeze()
-            if (
+            if self.adapter_config.adapter_name is None:
+                pass
+            elif (
                 self.adapter_config.adapter_name == "convpass"
                 and config.hidden_size == 768
             ):
@@ -261,7 +263,7 @@ class CLIPEncoderLayerWithAdapter(nn.Module):
     def forward_mlp(
         self, hidden_states: torch.Tensor, task_name: str = None
     ) -> torch.FloatTensor:
-        if self.adapter_config is None:
+        if self.adapter_config is None or self.adapter_config.adapter_name is None:
             hidden_states = self.forward_originmlp(hidden_states)
         else:
             hidden_states = self.forward_adaptmlp(hidden_states, task_name)

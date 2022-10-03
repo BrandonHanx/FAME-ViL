@@ -1,0 +1,57 @@
+# FashionIQ data nums: 18000
+
+includes:
+- fashioniq_dataset_cfg.yaml
+
+model_config:
+  fashionclip:
+    training_head_type: mtl
+    clip_config:
+      clip_model_name: openai/clip-vit-base-patch16
+    adapter_config:
+      freeze: false
+      enable_xattn: true
+      share_cross: false
+      share_adapter: false
+      cross_dropout: 0.0
+    lr_multiplier: 100
+    tasks:
+    - tgir
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: false
+    lr_steps:
+    - 4000
+    lr_ratio: 0.1
+    warmup_iterations: 2810
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-6
+    eps: 1e-8
+    weight_decay: 1e-5
+
+evaluation:
+  metrics:
+    - r@k_fashioniq
+
+training:
+  experiment_name: fashionclip_fashioniq_composition_xattn_noadapter
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 6000
+  log_interval: 10
+  checkpoint_interval: 5620
+  evaluation_interval: 562
+  find_unused_parameters: true
+  early_stop:
+    criteria: fashioniq/r@k_fashioniq/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
