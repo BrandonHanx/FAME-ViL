@@ -27,7 +27,11 @@ class FashionCLIPForMTL(FashionCLIPBaseModel):
         self.heads = nn.ModuleDict()
         self.loss_funcs = nn.ModuleDict()
         self.config = config
-        self.enable_xattn = config.adapter_config.enable_xattn
+        self.enable_xattn = (
+            config.adapter_config.enable_xattn
+            if hasattr(config, "adapter_config")
+            else False
+        )
 
         self.init_heads()
         self.init_losses()
