@@ -1,0 +1,52 @@
+# FashionGen data nums: 60147
+
+includes:
+- ./fashiongen_dataset_cfg.yaml
+
+model_config:
+  fashionclip:
+    training_head_type: mtl
+    clip_config:
+      clip_model_name: openai/clip-vit-base-patch16
+    tasks:
+    - itc
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: true
+    lr_steps:
+    - 20000
+    lr_ratio: 0.1
+    warmup_iterations: 1000
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-4
+    eps: 1e-8
+    weight_decay: 0.0
+
+evaluation:
+  metrics:
+  - type: r@k_general
+    datasets:
+    - fashiongen
+
+training:
+  experiment_name: ei-clip
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 30000
+  log_interval: 10
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  find_unused_parameters: true
+  early_stop:
+    criteria: fashiongen/r@k_general/avg
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
