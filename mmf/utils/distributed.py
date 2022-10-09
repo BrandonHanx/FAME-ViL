@@ -507,15 +507,18 @@ def all_gather_diff_size(q):
     if ws == 1:
         return [q]
 
-    device = q.device()
-    local_size = torch.tensor(q.size(), device=device)
+    device = q.device
+    local_shape = list(q.shape[0])
+    local_size = torch.tensor(local_shape[0], device=device)
     all_sizes = [torch.zeros_like(local_size) for _ in range(ws)]
     dist.all_gather(all_sizes, local_size)
     max_size = max(all_sizes)
 
     size_diff = max_size.item() - local_size.item()
     if size_diff:
-        padding = torch.zeros(size_diff, device=device, dtype=q.dtype)
+        pad_shape = local_shape
+        pad_shape[0] = size_diff
+        padding = torch.zeros(pad_shape, device=device, dtype=q.dtype)
         q = torch.cat((q, padding))
 
     all_qs_padded = [torch.zeros_like(q) for _ in range(ws)]
