@@ -1463,12 +1463,10 @@ class RecallAtK_general(BaseMetric):
         image_ids = sample_list["image_id"].squeeze()
         text_ids = sample_list["text_id"].squeeze()
 
-        image_embeddings = torch.cat(
-            all_gather_diff_size(image_embeddings), dim=0
-        ).cpu()
-        text_embeddings = torch.cat(all_gather_diff_size(text_embeddings), dim=0).cpu()
-        image_ids = torch.cat(all_gather_diff_size(image_ids), dim=0).cpu()
-        text_ids = torch.cat(all_gather_diff_size(text_ids), dim=0).cpu()
+        image_embeddings = torch.cat(all_gather_diff_size(image_embeddings), dim=0)
+        text_embeddings = torch.cat(all_gather_diff_size(text_embeddings), dim=0)
+        image_ids = torch.cat(all_gather_diff_size(image_ids), dim=0)
+        text_ids = torch.cat(all_gather_diff_size(text_ids), dim=0)
 
         keys = [
             f"i2t_r@1",
@@ -1799,11 +1797,11 @@ class RecallAtK_fashioniq(BaseMetric):
         fake_data = sample_list["fake_data"]
         garment_class = sample_list["garment_class"]
 
-        comp_embeddings = torch.cat(all_gather_diff_size(comp_embeddings), dim=0).cpu()
-        tar_embeddings = torch.cat(all_gather_diff_size(tar_embeddings), dim=0).cpu()
-        target_ids = torch.cat(all_gather_diff_size(target_ids), dim=0).cpu()
-        fake_data = torch.cat(all_gather_diff_size(fake_data), dim=0).cpu()
-        garment_class = torch.cat(all_gather_diff_size(garment_class), dim=0).cpu()
+        comp_embeddings = torch.cat(all_gather_diff_size(comp_embeddings), dim=0)
+        tar_embeddings = torch.cat(all_gather_diff_size(tar_embeddings), dim=0)
+        target_ids = torch.cat(all_gather_diff_size(target_ids), dim=0)
+        fake_data = torch.cat(all_gather_diff_size(fake_data), dim=0)
+        garment_class = torch.cat(all_gather_diff_size(garment_class), dim=0)
 
         dress_index = garment_class == 0
         shirt_index = garment_class == 1

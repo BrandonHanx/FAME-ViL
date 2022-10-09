@@ -508,7 +508,7 @@ def all_gather_diff_size(q):
         return [q]
 
     device = q.device
-    local_shape = list(q.shape[0])
+    local_shape = list(q.shape)
     local_size = torch.tensor(local_shape[0], device=device)
     all_sizes = [torch.zeros_like(local_size) for _ in range(ws)]
     dist.all_gather(all_sizes, local_size)
