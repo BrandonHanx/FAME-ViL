@@ -21,11 +21,11 @@ model_config:
       freeze: false
       adapter_name: scaled_pa
       bottleneck: 64
-      dropout: 0.2
+      dropout: 0
       enable_xattn: true
       share_cross: false
       share_adapter: false
-      cross_dropout: 0.2
+      cross_dropout: 0
       adapter_name_list:
       - itc
       - tgir
@@ -140,7 +140,7 @@ evaluation:
     - fashiongen_cap
 
 training:
-  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_dropout
+  experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_round_robin
   batch_size: 64
   lr_scheduler: true
   max_updates: 90000
@@ -162,4 +162,4 @@ run_type: train_val
 
 multitasking:
   enabled: true
-  type: size_proportional
+  type: round_robin
