@@ -53,7 +53,12 @@ import numpy as np
 import torch
 from mmf.common.registry import registry
 from mmf.datasets.processors.processors import EvalAIAnswerProcessor
-from mmf.utils.distributed import all_gather, is_main, get_world_size
+from mmf.utils.distributed import (
+    all_gather,
+    all_gather_diff_size,
+    is_main,
+    get_world_size,
+)
 from mmf.utils.logger import log_class_usage
 from sklearn.metrics import (
     average_precision_score,
@@ -1458,10 +1463,12 @@ class RecallAtK_general(BaseMetric):
         image_ids = sample_list["image_id"].squeeze()
         text_ids = sample_list["text_id"].squeeze()
 
-        image_embeddings = torch.cat(all_gather(image_embeddings), dim=0).cpu()
-        text_embeddings = torch.cat(all_gather(text_embeddings), dim=0).cpu()
-        image_ids = torch.cat(all_gather(image_ids), dim=0).cpu()
-        text_ids = torch.cat(all_gather(text_ids), dim=0).cpu()
+        image_embeddings = torch.cat(
+            all_gather_diff_size(image_embeddings), dim=0
+        ).cpu()
+        text_embeddings = torch.cat(all_gather_diff_size(text_embeddings), dim=0).cpu()
+        image_ids = torch.cat(all_gather_diff_size(image_ids), dim=0).cpu()
+        text_ids = torch.cat(all_gather_diff_size(text_ids), dim=0).cpu()
 
         keys = [
             f"i2t_r@1",
@@ -1792,11 +1799,11 @@ class RecallAtK_fashioniq(BaseMetric):
         fake_data = sample_list["fake_data"]
         garment_class = sample_list["garment_class"]
 
-        comp_embeddings = torch.cat(all_gather(comp_embeddings), dim=0).cpu()
-        tar_embeddings = torch.cat(all_gather(tar_embeddings), dim=0).cpu()
-        target_ids = torch.cat(all_gather(target_ids), dim=0).cpu()
-        fake_data = torch.cat(all_gather(fake_data), dim=0).cpu()
-        garment_class = torch.cat(all_gather(garment_class), dim=0).cpu()
+        comp_embeddings = torch.cat(all_gather_diff_size(comp_embeddings), dim=0).cpu()
+        tar_embeddings = torch.cat(all_gather_diff_size(tar_embeddings), dim=0).cpu()
+        target_ids = torch.cat(all_gather_diff_size(target_ids), dim=0).cpu()
+        fake_data = torch.cat(all_gather_diff_size(fake_data), dim=0).cpu()
+        garment_class = torch.cat(all_gather_diff_size(garment_class), dim=0).cpu()
 
         dress_index = garment_class == 0
         shirt_index = garment_class == 1
