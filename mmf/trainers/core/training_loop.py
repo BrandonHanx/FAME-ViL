@@ -293,11 +293,13 @@ class TrainerTrainingLoopMixin(ABC):
     def _finish_update(self):
         if self.training_config.buffer_gradients:
             for n, p in self.model.named_parameters():
-                # FIXME: only OGD is available now
                 if self.training_config.gradient_strategy == "sum":
                     p.grad = gradient_strategy.simple_sum(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "imtlg":
-                    p.grad = gradient_strategy.imtlg(p.grad, n, self.gradients)
+                    gradients = self.gradients
+                    del gradients["operate_task"]
+                    gradients = list(gradients.values())
+                    p.grad = gradient_strategy.imtlg(p.grad, n, gradients)
                 elif self.training_config.gradient_strategy == "ogd":
                     p.grad = gradient_strategy.ogd(p.grad, n, self.gradients)
                 else:
