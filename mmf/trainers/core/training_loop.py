@@ -296,9 +296,7 @@ class TrainerTrainingLoopMixin(ABC):
                 if self.training_config.gradient_strategy == "sum":
                     p.grad = gradient_strategy.simple_sum(p.grad, n, self.gradients)
                 elif self.training_config.gradient_strategy == "imtlg":
-                    gradients = self.gradients
-                    del gradients["operate_task"]
-                    gradients = list(gradients.values())
+                    gradients = list(self.gradients.values())[1:]
                     p.grad = gradient_strategy.imtlg(p.grad, n, gradients)
                 elif self.training_config.gradient_strategy == "ogd":
                     p.grad = gradient_strategy.ogd(p.grad, n, self.gradients)

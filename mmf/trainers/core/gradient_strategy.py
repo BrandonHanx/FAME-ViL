@@ -20,14 +20,17 @@ def imtlg(p_grad, name, gradient_list):
     for grad in gradient_list:
         if name in grad and grad[name] is not None:
             flatten_grad = torch.flatten(grad[name])
-            raw_grad.append(flatten_grad)
-            raw_grad_norm.append(F.normalize(flatten_grad, p=2, dim=-1))
+            if torch.any(flatten_grad):
+                raw_grad.append(flatten_grad)
+                raw_grad_norm.append(F.normalize(flatten_grad, p=2, dim=-1))
     if len(raw_grad) == 0:
         return p_grad
     if len(raw_grad) == 1:
-        return raw_grad[0]
+        return raw_grad[0].reshape(p_grad.shape)
 
     G = torch.stack(raw_grad)
+    if G.shape[-1] == 1:
+        return torch.mean(G).reshape(p_grad.shape)
     D = G[0] - G[1:]
     U = torch.stack(raw_grad_norm)
     U = U[0] - U[1:]
@@ -40,9 +43,8 @@ def imtlg(p_grad, name, gradient_list):
             torch.eye(len(raw_grad) - 1, device=G.device) * 1e-8
             + torch.matmul(D, U.t())
         )
-
     alpha_ = torch.matmul(first_element, second_element)
-    alpha = torch.stack(((1 - alpha_.sum()).unsqueeze(-1), alpha_))
+    alpha = torch.cat(((1 - alpha_.sum()).unsqueeze(-1), alpha_)).unsqueeze(-1)
     return torch.sum(G * alpha, dim=0).reshape(p_grad.shape)
 
 
