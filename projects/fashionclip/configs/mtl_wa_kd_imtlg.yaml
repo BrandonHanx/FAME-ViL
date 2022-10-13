@@ -108,10 +108,10 @@ scheduler:
   params:
     use_warmup: true
     lr_steps:
-    - 50000
-    - 80000
+    - 12500
+    - 20000
     lr_ratio: 0.1
-    warmup_iterations: 10000
+    warmup_iterations: 2500
     warmup_factor: 0.25
 
 optimizer:
@@ -143,10 +143,10 @@ training:
   experiment_name: fashionclip_mtl(itc+tgir+scr+cap)_wa_kd_xattn_imtlg
   batch_size: 64
   lr_scheduler: true
-  max_updates: 90000
+  max_updates: 22500
   log_interval: 10
-  checkpoint_interval: 1000
-  evaluation_interval: 1000
+  checkpoint_interval: 250
+  evaluation_interval: 250
   find_unused_parameters: true
   update_frequency: 4
   accumulate_feilds: false
