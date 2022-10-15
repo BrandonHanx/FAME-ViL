@@ -146,7 +146,7 @@ training:
   max_updates: 22500
   log_interval: 10
   checkpoint_interval: 250
-  evaluation_interval: 250
+  evaluation_interval: 500
   find_unused_parameters: true
   update_frequency: 4
   accumulate_feilds: false
