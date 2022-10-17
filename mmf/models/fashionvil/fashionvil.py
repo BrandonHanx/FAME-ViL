@@ -5,6 +5,7 @@ from typing import Dict
 import torch
 from mmf.common.registry import registry
 from mmf.models import BaseModel
+from mmf.models.fashionvil.captioning import FashionViLForCaptioning
 from mmf.models.fashionvil.classification import FashionViLForClassification
 from mmf.models.fashionvil.composition import FashionViLForComposition
 from mmf.models.fashionvil.contrastive import FashionViLForContrastive
@@ -59,6 +60,8 @@ class FashionViL(BaseModel):
             self.model = FashionViLForComposition(self.config)
         elif self.training_head_type == "contrastive":
             self.model = FashionViLForContrastive(self.config)
+        elif self.training_head_type == "captioning":
+            self.model = FashionViLForCaptioning(self.config)
         else:
             raise NotImplementedError
 

@@ -55,7 +55,12 @@ class FashionViLBase(BertPreTrainedModel):
 
         extended_attention_mask = None
         if attention_mask is not None:
-            extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+            if attention_mask.dim() == 4:
+                extended_attention_mask = attention_mask
+            elif attention_mask.dim() == 2:
+                extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+            else:
+                raise ValueError
             if not torch.jit.is_scripting():
                 extended_attention_mask = extended_attention_mask.to(
                     dtype=next(self.parameters()).dtype

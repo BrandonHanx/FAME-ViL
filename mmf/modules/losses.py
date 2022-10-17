@@ -591,6 +591,8 @@ class CrossEntropyLoss(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss(**params)
 
     def forward(self, sample_list, model_output):
+        if "scores" not in model_output.keys():
+            return 0
         return self.loss_fn(model_output["scores"], sample_list["targets"])
 
 

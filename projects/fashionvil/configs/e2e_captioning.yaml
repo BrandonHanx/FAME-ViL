@@ -1,0 +1,86 @@
+# FashionGen data nums: 60147
+
+includes:
+- configs/models/fashionvil/defaults.yaml
+
+dataset_config:
+  fashiongen_cap:
+    processors:
+      masked_token_processor:
+        type: fashionvil_text_tokenizer
+        params:
+          tokenizer_config:
+            type: bert-base-uncased
+            params:
+              do_lower_case: true
+          mask_probability: 0.15
+          max_seq_length: 75
+          do_whole_word_mask: false
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: torchvision_resnet
+      params:
+        name: resnet50
+        pretrained: true
+        zero_init_residual: false
+        num_output_features: -1
+        pool_type: avg
+    lr_multiplier: 20
+    direct_features_input: false
+    bert_model_name: bert-base-uncased
+    training_head_type: captioning
+    bypass_transformer: true
+    freeze_image_encoder: false
+    losses:
+      - type: cross_entropy
+        params:
+          ignore_index: -1
+    decoding_algorithm: greedy
+
+scheduler:
+  type: multi_step
+  params:
+    use_warmup: false
+    lr_steps:
+    - 20000
+    lr_ratio: 0.1
+    warmup_iterations: 2810
+    warmup_factor: 0.25
+
+optimizer:
+  type: adam_w
+  params:
+    lr: 1e-5
+    eps: 1e-8
+    weight_decay: 1e-4
+
+evaluation:
+  metrics:
+    - bleu4
+
+training:
+  experiment_name: fashionvil_captioning_fashiongen_e2e_final
+  batch_size: 64
+  lr_scheduler: true
+  max_updates: 30000
+  log_interval: 10
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  find_unused_parameters: true
+  early_stop:
+    criteria: fashiongen_cap/bleu4
+    minimize: false
+  wandb:
+    enabled: true
+
+run_type: train_val
+
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/backup_ckpts/fashionvil_final.pth
+  pretrained_state_mapping:
+    image_encoder: image_encoder
+    model.bert: model.bert
+    head: heads.mlm
