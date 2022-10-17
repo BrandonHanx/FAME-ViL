@@ -48,10 +48,11 @@ class FashionViLForCaptioning(FashionViLBaseModel):
 
     @staticmethod
     def _get_causal_mask(b, s, l, device):
-        causal_mask = torch.triu(torch.ones((s, s), device=device).long())  # s, s
+        causal_mask = torch.tril(torch.ones((s, s), device=device).long())  # s, s
         causal_mask = causal_mask.unsqueeze(0).repeat(b, 1, 1)  # b, s, s
-        attention_mask = torch.zeros((b, s + l, s + l), device=device).long()
+        attention_mask = torch.ones((b, s + l, s + l), device=device).long()
         attention_mask[:, :s, :s] = causal_mask
+        attention_mask[:, s:, :s] = 0
         attention_mask = attention_mask.unsqueeze(1)
         return attention_mask
 
