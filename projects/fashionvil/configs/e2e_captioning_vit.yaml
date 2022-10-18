@@ -1,0 +1,27 @@
+# FashionGen data nums: 60147
+
+includes:
+- ./e2e_captioning.yaml
+
+model_config:
+  fashionvil:
+    image_encoder:
+      type: vit_image_encoder
+      params:
+        name: vit
+        pretrained_model_name: google/vit-base-patch16-224-in21k
+        random_init: false
+        gradient_checkpointing: false
+    visual_embedding_dim: 768
+    lr_multiplier: 1
+
+training:
+  experiment_name: fashionvil_captioning_fashiongen_e2e_vit
+
+checkpoint:
+  resume_pretrained: true
+  resume_file: save/backup_ckpts/fashionvil_vit16.pth
+  pretrained_state_mapping:
+    image_encoder: image_encoder
+    model.bert: model.bert
+    head: heads.mlm
