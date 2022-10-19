@@ -592,7 +592,7 @@ class CrossEntropyLoss(nn.Module):
 
     def forward(self, sample_list, model_output):
         if "scores" not in model_output.keys():
-            return 0
+            return torch.tensor(0.0, device=sample_list["targets"].device)
         return self.loss_fn(model_output["scores"], sample_list["targets"])
 
 
