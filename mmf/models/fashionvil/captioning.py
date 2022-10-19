@@ -5,11 +5,14 @@ from copy import deepcopy
 from typing import Dict, Optional
 
 import torch
+import torch.nn.functional as F
 from mmf.models.fashionvil.base import FashionViLBaseModel
 from mmf.utils.configuration import get_mmf_cache_dir
 from torch import Tensor
 from transformers import BertTokenizer
+from transformers.generation_beam_search import BeamSearchScorer
 from transformers.modeling_bert import BertForPreTraining
+from transformers.pytorch_utils import torch_int_div
 
 
 class FashionViLForCaptioning(FashionViLBaseModel):
@@ -88,6 +91,111 @@ class FashionViLForCaptioning(FashionViLBaseModel):
         input_ids = torch.cat([input_ids, end_ids], dim=-1)
         return input_ids
 
+    @torch.no_grad()
+    def _beam_generation(
+        self,
+        sample_list: Dict[str, Tensor],
+        mask_token_id: Optional[int] = 103,
+        eos_token_id: Optional[int] = 102,
+        pad_token_id: Optional[int] = 0,
+        num_beams: Optional[int] = 5,
+    ) -> Dict[str, Tensor]:
+        b, l, _ = sample_list["image"].shape
+        device = sample_list["image"].device
+        batch_beam_size = num_beams * b
+        beam_scorer = BeamSearchScorer(
+            batch_size=b,
+            num_beams=num_beams,
+            device=device,
+        )
+
+        input_ids = sample_list.input_ids[:, 0].unsqueeze(dim=-1)
+        end_ids = eos_token_id * torch.ones_like(input_ids)
+        input_ids = input_ids.repeat(num_beams, 1)
+        mask_ids = mask_token_id * torch.ones_like(input_ids)
+
+        beam_scores = torch.zeros((b, num_beams), dtype=torch.float, device=device)
+        beam_scores[:, 1:] = -1e9
+        beam_scores = beam_scores.view((batch_beam_size,))
+        beam_indices = tuple(() for _ in range(batch_beam_size))
+
+        seq_len = 1
+        max_len = torch.max(torch.sum(sample_list.input_mask, dim=-1))
+        image = (
+            sample_list.image.unsqueeze(1).repeat(1, num_beams, 1, 1).flatten(end_dim=1)
+        )
+        visual_embeddings_type = (
+            sample_list.visual_embeddings_type.unsqueeze(1)
+            .repeat(1, num_beams, 1)
+            .flatten(end_dim=1)
+        )
+
+        while True:
+            next_embeddings, _, _ = self.bert.get_joint_embedding(
+                torch.cat([input_ids, mask_ids], dim=-1),
+                torch.zeros(batch_beam_size, seq_len + 1).long().to(device),
+                image,
+                visual_embeddings_type,
+                self._get_causal_mask(batch_beam_size, seq_len + 1, l, device),
+            )
+            next_logits = self.head(next_embeddings[:, seq_len])
+            next_scores = F.log_softmax(next_logits, dim=-1)
+
+            # FIXME: logits processor here
+            next_scores = next_scores + beam_scores[:, None].expand_as(next_scores)
+
+            vocab_size = next_scores.shape[-1]
+            next_scores = next_scores.view(b, num_beams * vocab_size)
+
+            next_scores, next_tokens = torch.topk(
+                next_scores, 2 * num_beams, dim=1, largest=True, sorted=True
+            )
+
+            next_indices = torch_int_div(next_tokens, vocab_size)
+            next_tokens = next_tokens % vocab_size
+
+            beam_outputs = beam_scorer.process(
+                input_ids,
+                next_scores,
+                next_tokens,
+                next_indices,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
+                beam_indices=beam_indices,
+            )
+
+            beam_scores = beam_outputs["next_beam_scores"]
+            beam_next_tokens = beam_outputs["next_beam_tokens"]
+            beam_idx = beam_outputs["next_beam_indices"]
+
+            input_ids = torch.cat(
+                [input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], dim=-1
+            )
+            beam_indices = tuple(
+                beam_indices[beam_idx[i]] + (beam_idx[i],)
+                for i in range(len(beam_indices))
+            )
+            seq_len = seq_len + 1
+
+            if beam_scorer.is_done or seq_len >= max_len:
+                break
+
+        sequence_outputs = beam_scorer.finalize(
+            input_ids,
+            beam_scores,
+            next_tokens,
+            next_indices,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            max_length=max_len,
+            beam_indices=beam_indices,
+        )
+
+        # in case the captions generation is not finished
+        # eos token has the largest id
+        sequence_outputs = torch.cat([sequence_outputs["sequences"], end_ids], dim=-1)
+        return sequence_outputs
+
     def _postprocess_generation(
         self, targets, predictions, eos_token_id: Optional[int] = 102
     ):
@@ -99,6 +207,7 @@ class FashionViLForCaptioning(FashionViLBaseModel):
             references.append([self.tokenizer.decode(x[1:eos_x])])
             captions.append(self.tokenizer.decode(y[1:eos_y]))
         output_dict = {"captions": captions, "references": references}
+        print(captions[0], references[0])
         return output_dict
 
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
@@ -124,8 +233,8 @@ class FashionViLForCaptioning(FashionViLBaseModel):
         else:
             if self.config.decoding_algorithm == "greedy":
                 predictions = self._greedy_generation(sample_list)
-            # elif self.config.decoding_algorithm == "beam":
-            #     predictions = self._beam_generation(sample_list)
+            elif self.config.decoding_algorithm == "beam":
+                predictions = self._beam_generation(sample_list)
             else:
                 raise NotImplementedError
             output_dict = self._postprocess_generation(
