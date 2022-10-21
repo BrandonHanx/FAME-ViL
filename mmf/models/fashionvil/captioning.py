@@ -207,7 +207,6 @@ class FashionViLForCaptioning(FashionViLBaseModel):
             references.append([self.tokenizer.decode(x[1:eos_x])])
             captions.append(self.tokenizer.decode(y[1:eos_y]))
         output_dict = {"captions": captions, "references": references}
-        print(captions[0], references[0])
         return output_dict
 
     def _forward(self, sample_list: Dict[str, Tensor]) -> Dict[str, Tensor]:
