@@ -13,4 +13,6 @@
 - :heart_eyes: (21/03/2023) Our FAME-ViL is selected as a **highlight paper** at CVPR 2023! (**Top 2.5%** of 9155 submissions)
 - :blush: (12/03/2023) Code released!
 
+Our trained model is available at [Google Drive](https://drive.google.com/file/d/11U5PZU9BE3gQ1dzvJdrav5V2mRNW-pEq/view?usp=sharing).
+
 A detailed README will be updated later. Please stay tuned!
