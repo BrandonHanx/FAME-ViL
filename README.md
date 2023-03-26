@@ -22,6 +22,7 @@ config=projects/fashionclip/configs/mtl_wa.yaml \
 model=fashionclip \
 datasets=fashioniq \
 checkpoint.resume_file=save/backup_ckpts/fashionclip_512.pth \
+run_type=test \
 model_config.fashionclip.adapter_config.bottleneck=512
 ```
 
