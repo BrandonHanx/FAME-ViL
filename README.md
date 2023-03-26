@@ -13,6 +13,16 @@
 - :heart_eyes: (21/03/2023) Our FAME-ViL is selected as a **highlight paper** at CVPR 2023! (**Top 2.5%** of 9155 submissions)
 - :blush: (12/03/2023) Code released!
 
-Our trained model is available at [Google Drive](https://drive.google.com/file/d/11U5PZU9BE3gQ1dzvJdrav5V2mRNW-pEq/view?usp=sharing).
+Our trained model is available at [Google Drive](https://drive.google.com/drive/folders/17YflGKqt4sLbsfCSKZTGzdwaP9JcO7aN?usp=sharing).
+
+Test on FashionIQ
+```
+python mmf_cli/run.py \
+config=projects/fashionclip/configs/mtl_wa.yaml \
+model=fashionclip \
+datasets=fashioniq \
+checkpoint.resume_file=save/backup_ckpts/fashionclip_512.pth \
+model_config.fashionclip.adapter_config.bottleneck=512
+```
 
 A detailed README will be updated later. Please stay tuned!
