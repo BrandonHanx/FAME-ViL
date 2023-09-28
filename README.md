@@ -15,6 +15,8 @@
 
 Our trained model is available at [Google Drive](https://drive.google.com/drive/folders/17YflGKqt4sLbsfCSKZTGzdwaP9JcO7aN?usp=sharing).
 
+Please refer to [FashionViL repo](https://github.com/BrandonHanx/mmf#data-preparation) for the dataset preparation.
+
 Test on FashionIQ
 ```
 python mmf_cli/run.py \
@@ -25,5 +27,3 @@ checkpoint.resume_file=save/backup_ckpts/fashionclip_512.pth \
 run_type=test \
 model_config.fashionclip.adapter_config.bottleneck=512
 ```
-
-A detailed README will be updated later. Please stay tuned!
